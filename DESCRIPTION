@@ -1,0 +1,14 @@
+Package: Dsi.Assign2.AMSV
+Type: Package
+Title: Code and documentation to fulfill the requirements of Assignment 2 for the STA5073Z course
+Version: 0.1.0
+Author: person("Sameshan", "Perumal", email = "prmsam001@myuct.ac.za", role = c("aut", "cre")),
+  person("Audrey", "Pentz", role = c("aut", "cre")),
+  person("Merve", "Aydin", role = c("aut", "cre")),
+  person("Vanessa", "Saker", role = c("aut", "cre"))
+Maintainer: Sameshan Perumal <prmsam001@myuct.ac.za>
+Description: More about what it does (maybe more than one line)
+    Use four spaces when indenting paragraphs within the Description.
+License: MIT + file LICENSE
+Encoding: UTF-8
+LazyData: true
