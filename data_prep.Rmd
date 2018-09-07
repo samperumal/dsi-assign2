@@ -6,9 +6,20 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
- 
-library(tidyverse)
+knitr::opts_chunk$set(echo = TRUE)
 
+library(tidyverse)
+library(stringr)
+library(lubridate)
+library(tidytext)
+library(rpart) 
+library(wordcloud)
+library(RColorBrewer)
+options(repr.plot.width=4, repr.plot.height=3) # set plot size in the notebook
+
+```
+
+```{r}
 txt_files <- list.files("~/Downloads/sona-text-1994-2018/")
 
 sona <- data.frame(filename = as.character(), speech = as.character())
@@ -77,6 +88,18 @@ tidy_sona = tidy_sona %>%  unnest_tokens(word, text, token = "regex", pattern = 
 # exercise: reshape long to wide to get into usual format for predictive models 
 #Turning long format into wide
 words_wide <- tidy_sona %>% spread(key = "word", value = "n")
+
+```
+
+```{r}
+#Bind tf_idf
+tidy_sona <- tidy_sona %>%
+  bind_tf_idf(word, filename, n)
+tidy_sona
+
+tidy_sona %>%
+  select(-year) %>%
+  arrange(desc(tf_idf))
 
 ```
 
