@@ -77,17 +77,16 @@ sentence_word_count = left_join(sentence_word_count, df)
 colnames(sentence_word_count[4]) <- "response"
 
 #Removing the stop words
-data(stop_words)
-tidy_sona <- sentence_word_count %>%
-  anti_join(stop_words,by=c("text"="word"))
+#data(stop_words)
+#tidy_sona <- sentence_word_count %>% anti_join(stop_words,by=c("text"="word"))
 
 #Taking out regular expressions
-unnest_reg <- "[^A-Za-z\\d_#@']"
-tidy_sona = tidy_sona %>%  unnest_tokens(word, text, token = "regex", pattern = unnest_reg)
+# unnest_reg <- "[^A-Za-z\\d_#@']"
+# tidy_sona = sentence_word_count %>%  unnest_tokens(word, text, token = "regex", pattern = unnest_reg)
  
 # exercise: reshape long to wide to get into usual format for predictive models 
 #Turning long format into wide
-words_wide <- tidy_sona %>% spread(key = "word", value = "n")
+words_wide <- sentence_word_count %>% spread(key = "word", value = "n")
 
 ```
 
@@ -100,6 +99,12 @@ tidy_sona
 tidy_sona %>%
   select(-year) %>%
   arrange(desc(tf_idf))
+
+```
+
+```{r}
+gsub("as.character(0-9+_post_elections_).*", "\\1", tidy_sona$filename)
+sub("1994_post_elections_.*", " ", as.character(tidy_sona$filename))
 
 ```
 
