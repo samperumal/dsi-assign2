@@ -7,7 +7,7 @@ extractData = function(filePath) {
   files = list.files(filePath, full.names = TRUE)
 
   parseFilename = function(filename) {
-    matches = str_match(filename, "[^/]*/?(\\d{4})_(post|pre|)(?:_elections_|)(.+)\\.txt")
+    matches = str_match(filename, "[^/]*/?(\\d{4})_(post|pre|)(?:_elections_|) *(.+)\\.txt")
     return (matches)
   }
 
