@@ -26,7 +26,12 @@ extractData = function(filePath) {
     return(result)
   }
 
-  sentences = lapply(files, parseFile) %>% bind_rows()  %>% unnest_tokens(sentence, speech, token = "sentences") %>% mutate(id = digest::digest(sentence))
+  sentences = lapply(files, parseFile) %>% bind_rows() %>%
+    unnest_tokens(sentence, speech, token = "sentences") %>%
+    rowwise() %>%
+    mutate(id = digest::digest(sentence)) %>%
+    ungroup()
+
   presidents = sentences %>% select(president) %>% distinct()
 
   return (list(

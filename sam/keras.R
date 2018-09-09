@@ -7,6 +7,7 @@ reticulate::import_from_path("rpytools", path = "C:/Program Files/R/R-3.4.4/libr
 if (!exists("inputData"))
   source("sam/data-preprocessing.R")
 
+
 #presidents = unlist(inputData$presidents)
 
 #keras::text_one_hot(presidents, n = length(presidents))
@@ -25,6 +26,10 @@ tokenizer$fit_on_texts(c("hello world", "by SAM"))
 tokenizer$texts_to_matrix(c("hello world", "by world", "hello hello by SAM"), mode = "binary")
 tokenizer$texts_to_sequences(c("hello world", "by world", "hello hello by SAM"))
 texts_to_sequences(tokenizer, c("hello world", "by world", "hello hello by by"))
+
+testseq = tokenizer$texts_to_sequences(c("hello world", "by world", "hello hello by SAM"))
+
+pad_sequences(testseq, 3, padding = "post", truncating = "post")
 
 sentences = inputData$sentences %>% select(sentence) %>%
   as_tibble() %>%
