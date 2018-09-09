@@ -1,0 +1,208 @@
+---
+title: "Sentiment_Analysis_AP"
+author: "Audrey Pentz"
+date: "September 9, 2018"
+output: html_document
+---
+
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(
+  echo = TRUE,
+  library(tidyverse),
+  library(tidytext),
+  library(stringr),
+  library(lubridate),
+  library(qdap)
+)
+
+```
+
+
+
+## Read in the Data
+
+```{r}
+
+txt_files <- list.files("../sona-text-1994-2018/")
+
+sona <- data.frame(filename = as.character(), speech = as.character())
+for(i in txt_files){
+  file_name <- paste0("../sona-text-1994-2018/", i)
+  
+  # import text as single character string (can also read.table but the "seperator" causes problems)
+  this_speech <- readChar(file_name, 
+                          nchars = file.info(file_name)$size)
+  
+  # make data frame with metadata (filename contains year and pres) and speech
+  this_sona <- data.frame(filename = i, speech = this_speech, stringsAsFactors = FALSE)
+  
+  # make a single dataset
+  sona <- rbind(sona, this_sona)
+}
+
+# extract year
+sona$year <- str_sub(sona$filename, start = 1, end = 4)
+
+# extract president name
+sona$president <- unlist(str_extract_all(sona$filename, '(?<=_)[^_]+(?=.txt)'))
+# this finds everything between "_" and ".txt"
+
+```
+
+
+
+## Tokenize by Sentences and Words
+
+```{r}
+
+# unnest_tokens is very useful, can split into words, sentences, lines, paragraphs, etc
+
+# word tokenization
+# sona %>% unnest_tokens(text, speech, token = "words")
+
+# we want to predict sentences, so we need to first split into sentences
+tidy_sona_sentences <- sona %>% 
+  unnest_tokens(text, speech, token = "sentences")
+
+# exercise: add an ID variable for sentences and tokenize each sentence by words
+tidy_sona_sentences <- tidy_sona_sentences %>%
+  mutate(sentence_id = row_number() )
+
+tidy_sona_words <- tidy_sona_sentences %>% 
+  unnest_tokens(word, text, token = "words")
+
+# view data
+View(tidy_sona_sentences)
+View(tidy_sona_words)
+
+```
+
+
+
+## Sentiment Analysis using "bing" lexicon (positive vs negative words)
+
+### Sentiment Summary
+
+```{r bing}
+
+tidy_sona_words %>%
+  inner_join(get_sentiments("bing")) %>%
+  count(sentiment) %>%
+  spread(sentiment, n, fill = 0) %>%
+  mutate(sentiment = positive - negative,
+         avg_sentiment = (positive - negative) / nrow(tidy_sona_words) * 100)
+
+```
+
+
+### What are the positive words most used
+
+```{r}
+
+tidy_sona_words %>%
+  inner_join(get_sentiments("bing")) %>% 
+  filter(sentiment == "positive") %>%
+  count(word) %>%
+  arrange(desc(n)) %>%
+  filter(rank(desc(n)) <= 20) %>%
+  ggplot(aes(reorder(word,n),n)) + geom_col() + coord_flip() + xlab("")
+
+```
+
+
+### What are the negative words most used
+
+```{r}
+
+tidy_sona_words %>%
+  inner_join(get_sentiments("bing")) %>% 
+  filter(sentiment == "negative") %>%
+  count(word) %>%
+  arrange(desc(n)) %>%
+  filter(rank(desc(n)) <= 20) %>%
+  ggplot(aes(reorder(word,n),n)) + geom_col() + coord_flip() + xlab("")
+
+```
+
+
+
+## How does sentiment change over time?
+
+```{r}
+
+sentiments_per_year <- tidy_sona_words %>%
+  inner_join(get_sentiments("bing")) %>%
+  group_by(year, sentiment) %>%
+  summarize(n = n()) 
+sentiments_per_year
+
+sentiments_per_year <- sentiments_per_year %>% 
+  left_join(sentiments_per_year %>% 
+            group_by(year) %>% 
+            summarise(total = sum(n))) %>%
+  mutate(freq = n/total) 
+head(sentiments_per_year)
+
+# plot number of positive and negative words used
+ggplot(filter(sentiments_per_year), aes(x = year, y = n, fill = sentiment)) +
+  geom_col()
+
+# plot proportion of positive and negative words used
+ggplot(filter(sentiments_per_year), aes(x = year, y = freq, fill = sentiment)) +
+  geom_col()
+
+```
+
+
+
+## Sentiment Analysis using "afinn" lexicon (scale from -5 negative to +5 positive)
+
+```{r afinn}
+
+tidy_sona_words %>%
+  inner_join(get_sentiments("afinn")) %>%
+  count(score) %>% 
+  mutate(weighted_score = score * n)
+
+tidy_sona_words %>%
+  inner_join(get_sentiments("afinn")) %>%
+  summarise(sentiment = sum(score),
+            avg_sentiment = sum(score) / nrow(tidy_sona_words) * 100)
+
+```
+
+
+
+## Sentiment Analysis using "nrc" lexicon (infers emotion with certain words)
+
+```{r}
+
+tidy_sona_words %>%
+  inner_join(get_sentiments("nrc")) %>%
+  count(sentiment)
+
+tidy_sona_words %>%
+  inner_join(get_sentiments("nrc")) %>%
+  count(sentiment) %>%
+  filter(sentiment %in% c("positive", "negative")) %>%
+  spread(sentiment, n, fill = 0) %>%
+  mutate(sentiment = positive - negative,
+         sentiment_norm = (positive - negative) / nrow(tidy_sona_words) * 100)
+
+```
+
+## STILL TO DO:
+## Aggregating sentiment over words
+## Dealing with Negation
+## Per President
+
+```{r}
+
+
+
+
+```
+
+
