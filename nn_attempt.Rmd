@@ -1,0 +1,195 @@
+---
+title: "More neural networks"
+author: ""
+date: ""
+output: html_document
+---
+
+
+## Revisiting tweet classification
+
+Previously we used a simple bag-of-words model to predict whether a tweet made by Donald Trump was made before or after he became president. Here we use a CNN to do the same thing. The CNN allows us to exploit some of the relationships that exist between words. 
+
+Load the data and required packages.
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(stringr)
+library(lubridate)
+library(tidytext)
+library(rpart) 
+library(wordcloud)
+library(RColorBrewer)
+options(repr.plot.width=4, repr.plot.height=3) # set plot size in the notebook
+
+```
+
+```{r}
+txt_files <- list.files("~/Downloads/sona-text-1994-2018/")
+
+sona <- data.frame(filename = as.character(), speech = as.character())
+for(i in txt_files){
+  file_name <- paste0("~/Downloads/sona-text-1994-2018/", i)
+  
+  # import text as single character string (can also read.table but the "seperator" causes problems)
+  this_speech <- readChar(file_name, 
+                          nchars = file.info(file_name)$size)
+  
+  # make data frame with metadata (filename contains year and pres) and speech
+  this_sona <- data.frame(filename = i, speech = this_speech, stringsAsFactors = FALSE)
+  
+  # make a single dataset
+  sona <- rbind(sona, this_sona)
+}
+
+# extract year, testing
+str_extract(sona$filename, "[0-9]")
+str_extract_all(sona$filename, "[0-90-90-90-9]")
+str_extract_all(sona$filename, "[0-9][0-9][0-9][0-9]")
+str_extract_all(sona$filename, "[0-9][0-9][0-9][0-9]", simplify = T)
+str_extract(sona$filename, "[0-9]{4}")
+
+# does the same thing
+str_sub(sona$filename, start = 1, end = 4)
+
+sona$year <- str_sub(sona$filename, start = 1, end = 4)
+
+# exercise: extract president name
+
+
+# pre-processing data to get into right format for neural nets
+
+# unnest_tokens is very useful, can split into words, sentences, lines, paragraphs, etc
+
+# we want to predict sentences, so we need to first split into sentences
+sona = sona %>% unnest_tokens(text, speech, token = "sentences")
+sona$filename = gsub(".*[_]([^.]+)[.].*", "\\1", (sona$filename))
+
+# exercise: add an ID variable for sentences and tokenize each sentence by words
+
+df = tibble::rowid_to_column(sona, "ID")
+colnames(df)[1] <- "sentence_id"
+
+df$response = df$filename
+df$response = factor(df$response)
+levels(df$response) <- 1:length(levels(df$response))
+# exercise: count how many times each word was used in each sentence
+```
+
+Pre-process the data, as before.
+
+```{r}
+df <- as.tibble(df)
+
+
+# take a sample of 1000 tweets before and after he became president
+df <- df %>% group_by(response) %>% 
+  sample_n(50)
+```
+
+```{r}
+max_features <- 200        # choose max_features most popular words
+minlen <- 5                # exclude tweets shorter than this
+maxlen <- 32               # longest tweet (for padding)
+embedding_dims <- 10       # number of dimensions for word embedding
+```
+
+Here we use Keras to tokenize the tweets - this turns each tweet into a vector of integers, each integer representing a word. 
+
+```{r}
+tokenizer = text_tokenizer(num_words = max_features)
+fit_text_tokenizer(tokenizer, df$text)
+sequences = tokenizer$texts_to_sequences(df$text)
+```
+
+We need to remove tweets with just a single word, or we get an error. I also throw out very short tweets (less than 5 words), but this is not strictly needed.
+
+```{r}
+seq_ok <- unlist(lapply(sequences, length)) > minlen
+# outcome variable (1 = when president, 0 = before)
+y <- as.integer(df$response[seq_ok])
+categorical_labels = to_categorical(y, num_classes=6)
+
+
+
+# exclude short sequences
+lengthIs <- function(n) function(x) length(x)>n
+sequences <- Filter(lengthIs(minlen), sequences)
+```
+
+We then split up the training and test set.
+
+```{r}
+test <- list()
+train <- list()
+train_id <- sample(1:length(sequences),
+                size = 0.9*length(sequences), 
+                replace=F)
+test$x <-  sequences[-train_id]
+train$x <- sequences[train_id]
+
+train$y <- y[train_id]
+test$y <-  y[-train_id]
+```
+
+Sequences are of different length. We "pad" the shorter sequences with zeros so that all padded sequences are the same length.
+
+```{r}
+x_train <- train$x %>% pad_sequences(maxlen = maxlen)
+x_test <- test$x %>% pad_sequences(maxlen = maxlen)
+```
+
+We can now define the model
+
+```{r}
+model <- keras_model_sequential()
+```
+
+```{r}
+model %>% 
+  # embedding layer maps vocab indices into embedding_dims dimensions
+  layer_embedding(max_features, embedding_dims, input_length = maxlen) %>%
+  # add some dropout
+  layer_dropout(0.2) %>%
+  # convolutional layer
+  layer_conv_1d(
+    filters = 250,
+    kernel_size = 3, 
+    padding = "valid",  # "valid" means no padding, as we did it already
+    activation = "relu", 
+    strides = 1
+  ) %>%
+  layer_global_max_pooling_1d() %>%
+  layer_dense(128) %>%
+  layer_dropout(0.2) %>%
+  layer_activation("relu") %>%
+  layer_dense(1) %>%   # single unit output layer
+  layer_activation("sigmoid")
+```
+
+Compile the model:
+
+```{r}
+model %>% compile(
+  loss = "categorical_crossentropy",
+  optimizer = "adam",
+  metrics = "accuracy"
+)
+```
+
+Train and evaluate the model:
+
+```{r}
+model %>%
+  fit(
+    x_train, train$y,
+    batch_size = 32,
+    epochs = 10,
+    validation_data = list(x_test, test$y)
+  )
+
+train$y
+```
