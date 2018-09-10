@@ -1,4 +1,5 @@
 require(tidyverse)
+require(tidytext)
 
 filePath = "sona-text-1994-2018/"
 
@@ -6,7 +7,7 @@ extractData = function(filePath) {
   files = list.files(filePath, full.names = TRUE)
 
   parseFilename = function(filename) {
-    matches = str_match(filename, "[^/]*/?(\\d{4})_(post|pre|)(?:_elections_|)(.+)\\.txt")
+    matches = str_match(filename, "[^/]*/?(\\d{4})_(post|pre|)(?:_elections_|) *(.+)\\.txt")
     return (matches)
   }
 
@@ -25,9 +26,16 @@ extractData = function(filePath) {
     return(result)
   }
 
-  sentences = lapply(files, parseFile) %>% bind_rows()  %>% unnest_tokens(sentence, speech, token = "sentences") %>% mutate(id = digest::digest(sentence))
+  sentences = lapply(files, parseFile) %>% bind_rows() %>%
+    unnest_tokens(sentence, speech, token = "sentences") %>%
+    rowwise() %>%
+    mutate(id = digest::digest(sentence)) %>%
+    ungroup()
+
+  presidents = sentences %>% select(president) %>% distinct()
 
   return (list(
+    presidents = presidents,
     sentences = sentences,
     words = sentences %>% unnest_tokens(word, sentence, token = "words")
   ))
@@ -35,5 +43,5 @@ extractData = function(filePath) {
 
 inputData = extractData(filePath)
 
-View(inputData$sentences)
-View(inputData$words)
+#View(inputData$sentences)
+#View(inputData$words)
