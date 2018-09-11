@@ -1,0 +1,246 @@
+---
+title: "Neural networks with tf-idf using keras"
+author: "Merve Aydin Chester"
+date: ""
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(keras)
+library(tidyverse)
+library(tidytext)
+```
+
+```{r}
+txt_files <- list.files("~/Downloads/sona-text-1994-2018/")
+
+sona <- data.frame(filename = as.character(), speech = as.character())
+for(i in txt_files){
+  file_name <- paste0("~/Downloads/sona-text-1994-2018/", i)
+  
+  # import text as single character string (can also read.table but the "seperator" causes problems)
+  this_speech <- readChar(file_name, 
+                          nchars = file.info(file_name)$size)
+  
+  # make data frame with metadata (filename contains year and pres) and speech
+  this_sona <- data.frame(filename = i, speech = this_speech, stringsAsFactors = FALSE)
+  
+  # make a single dataset
+  sona <- rbind(sona, this_sona)
+}
+
+# extract year, testing
+str_extract(sona$filename, "[0-9]")
+str_extract_all(sona$filename, "[0-90-90-90-9]")
+str_extract_all(sona$filename, "[0-9][0-9][0-9][0-9]")
+str_extract_all(sona$filename, "[0-9][0-9][0-9][0-9]", simplify = T)
+str_extract(sona$filename, "[0-9]{4}")
+
+# does the same thing
+str_sub(sona$filename, start = 1, end = 4)
+
+sona$year <- str_sub(sona$filename, start = 1, end = 4)
+
+
+# unnest_tokens is very useful, can split into words, sentences, lines, paragraphs, etc
+
+# we want to predict sentences, so we need to first split into sentences
+sona = sona %>% unnest_tokens(text, speech, token = "sentences")
+sona$presidents = gsub(".*[_]([^.]+)[.].*", "\\1", (sona$filename))
+
+# exercise: add an ID variable for sentences and tokenize each sentence by words
+
+df = tibble::rowid_to_column(sona, "ID")
+```
+
+```{r}
+president_word_count = df %>%
+  group_by(presidents) %>%
+  unnest_tokens(word, text) %>%
+  count(ID, word, sort = TRUE) %>%
+  ungroup()
+  
+#Join to get the file name and presidents
+president_word_count = left_join(president_word_count, df)
+
+bag_of_words <- president_word_count %>% 
+  select(ID, prez = presidents,  word,n) %>% 
+  spread(key = word, value = n, fill = 0)
+
+set.seed(321)
+training_ids <- bag_of_words %>% 
+  group_by(prez) %>% 
+  sample_frac(0.9) %>% 
+  ungroup() %>%
+  select(ID)
+
+training_sona <- bag_of_words %>% 
+  right_join(training_ids, by = "ID") %>%
+  select(-ID)
+
+test_sona <- bag_of_words %>% 
+  anti_join(training_ids, by = "ID") %>%
+  select(-ID)
+
+```
+
+### Data preparation for NN
+
+
+```{r}
+# Seperate response variable
+dim(training_sona) #6626 rows 10626 cols
+x_train <- as.matrix(training_sona %>% select(-prez))
+x_test <- as.matrix(test_sona %>% select(-prez), ncol = 10625)
+
+#One-hot encoding for response variable
+labels_test = test_sona %>% select(prez) %>% unlist()
+president_count = labels_test %>% as_tibble() %>% unique() %>% count()
+response_tokenizer = text_tokenizer(num_words = president_count + 1)
+response_tokenizer$fit_on_texts(labels_test)
+# Extract response vector, ignoring first (empty) column
+y_test = (response_tokenizer$texts_to_matrix(labels_test, mode = "binary"))[,-1]
+
+labels_train = training_sona %>% select(prez) %>% unlist()
+president_count = labels_train %>% as_tibble() %>% unique() %>% count()
+response_tokenizer = text_tokenizer(num_words = president_count + 1)
+response_tokenizer$fit_on_texts(labels_train)
+# Extract response vector, ignoring first (empty) column
+y_train = (response_tokenizer$texts_to_matrix(labels_train, mode = "binary"))[,-1]
+```
+
+
+### Basic feed-forward neural network
+
+#### Create the model
+
+
+Creating an empty sequential model:
+
+
+```{r}
+model <- keras_model_sequential()
+```
+
+#### Define the model
+
+Define a model by sequentially adding layers.
+
+
+```{r}
+model <- keras_model_sequential()
+
+model %>% 
+  layer_dense(units = 256,                  # number of neurons in the hidden layer
+              input_shape = c(10625), kernel_regularizer = regularizer_l2(l = 0.002)) %>%    # dimension of input array
+  layer_activation('relu') %>% 
+  layer_dense(units = 128, kernel_regularizer = regularizer_l2(l = 0.001)) %>%
+  layer_dropout(0.3) %>%
+  layer_activation("relu") %>%
+  layer_dense(units = 64, kernel_regularizer = regularizer_l2(l = 0.001)) %>%
+  layer_dropout(0.1) %>%
+  layer_activation("relu") %>%
+  layer_dense(32, kernel_regularizer = regularizer_l2(l = 0.001)) %>%
+  layer_dropout(0.1) %>%
+  layer_activation("relu") %>%
+  layer_dense(32, kernel_regularizer = regularizer_l2(l = 0.001)) %>%
+  layer_dropout(0.1) %>%
+  layer_activation("relu") %>%
+  layer_dense(president_count, kernel_regularizer = regularizer_l2(l = 0.001)) %>%  
+  # single unit output layer
+  layer_activation("softmax")
+
+
+```
+
+
+```{r}
+summary(model)
+```
+
+#### Compile the model 
+
+
+```{r}
+model %>% compile(
+  optimizer = 'rmsprop',
+  loss = 'categorical_crossentropy',
+  metrics = c('accuracy')
+)
+```
+
+We could have done the define and compile steps together, using the pipe, if we wanted to:
+
+
+```{r}
+model %>% fit(x_train, y_train, epochs = 10, batch_size = 32, validation_data = list(x_test, y_test)
+) %>% plot()
+```
+
+#### Evaluate the model 
+
+Once the model is trained, we can evaluate its performance on the test data.
+
+
+```{r}
+model %>% evaluate(x_test, y_test, batch_size=32, verbose = 1)
+```
+
+#### Generate predictions on new data (e.g. test data)
+
+This is done in a straightforward way by passing new data to `predict_classes()`
+
+
+```{r}
+model %>% predict_classes(x_test) %>% head()
+```
+
+### Adding more layers = Deep learning
+
+Adding additional layers is straightforward in Keras. In this secton we build a model with two (rather than one) hidden layers. This model has the same number of hidden nodes as the previous model, half in each of the hidden layers. We use the same steps as before, so just give the headings.
+
+#### Create the model with compiling
+
+```{r}
+model2 <- keras_model_sequential()
+
+
+model2 %>% 
+  layer_dense(units = 256, input_shape = ncol(x_train), kernel_regularizer = regularizer_l1_l2(l1 = 0.001, l2 = 0.001)) %>% 
+  layer_activation_leaky_relu() %>% 
+  layer_dropout(rate = 0.3) %>% 
+  layer_dense(units = 128) %>%
+  layer_activation_leaky_relu() %>% 
+  layer_dropout(rate = 0.1) %>%
+  layer_dense(units = 6, activation = 'softmax') %>% 
+  compile(
+    loss = 'categorical_crossentropy',
+    optimizer = optimizer_rmsprop(lr = 0.001),
+    metrics = c('accuracy')
+  )
+
+```
+
+
+```{r}
+summary(model2)
+```
+
+#### Train the model
+
+
+```{r}
+model2 %>% fit(x_train, y_train, epochs = 10, batch_size = 32) %>% plot()
+
+```
+
+#### Evaluate the model 
+
+```{r}
+model2 %>% evaluate(x_test, y_test, batch_size=32, verbose = 1)
+```
