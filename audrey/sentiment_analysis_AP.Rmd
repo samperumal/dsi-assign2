@@ -1,5 +1,5 @@
 ---
-title: "Sentiment_Analysis_AP"
+title: "Sentiment_Analysis"
 author: "Audrey Pentz"
 date: "September 9, 2018"
 output: html_document
@@ -14,8 +14,50 @@ knitr::opts_chunk$set(
   library(tidytext),
   library(stringr),
   library(lubridate),
-  library(qdap)
+  library(qdap),
+  library(knitr)
 )
+
+my_colors <- c("#E69F00", "#56B4E9", "#009E73", "#CC79A7", "#D55E00", "#D65E00")
+
+library(widyr)                  # For pairwise correlation
+
+# Visualizations
+library(ggrepel)                # geom_label_repel
+library(gridExtra)              # grid.arrange for multi-graphs
+library(kableExtra)             # tables
+library(formattable)            # color_tile
+library(circlize)               # chord diagram
+library(memery)                 # images with plots
+library(magick)                 # images with plots (image_read)
+library(yarrr)                  # pirate plot
+library(radarchart)             # radar chart
+library(igraph)                 # network diagrams
+library(ggraph)                 # network diagrams
+
+
+# Define some colors to use
+my_colors <- c("#E69F00", "#56B4E9", "#009E73", "#CC79A7", "#D55E00", "#D65E00")
+
+# Customize ggplot2's default theme settings
+theme_sentiment <- function(aticks = element_blank(),
+                         pgminor = element_blank(),
+                         lt = element_blank(),
+                         lp = "none")
+{
+  theme(plot.title = element_text(hjust = 0.5), # Center the title
+        axis.ticks = aticks,                    # Set axis ticks to on or off
+        panel.grid.minor = pgminor,             # Turn the minor grid lines on or off
+        legend.title = lt,                      # Turn the legend title on or off
+        legend.position = lp)                   # Turn the legend on or off
+}
+
+# Customize the text tables for consistency using HTML formatting
+my_kable_styling <- function(dat, caption) {
+  kable(dat, "html", escape = FALSE, caption = caption) %>%
+  kable_styling(bootstrap_options = c("striped", "condensed", "bordered"),
+                full_width = FALSE)
+}
 
 ```
 
@@ -23,7 +65,7 @@ knitr::opts_chunk$set(
 
 ## Read in the Data
 
-```{r}
+```{r import}
 
 txt_files <- list.files("../sona-text-1994-2018/")
 
@@ -53,29 +95,94 @@ sona$president <- unlist(str_extract_all(sona$filename, '(?<=_)[^_]+(?=.txt)'))
 
 
 
-## Tokenize by Sentences and Words
+## Remove Stop Words and Tokenize by Sentences, Words and Bigrams
 
-```{r}
+```{r tokenize}
 
-# unnest_tokens is very useful, can split into words, sentences, lines, paragraphs, etc
-
-# word tokenization
-# sona %>% unnest_tokens(text, speech, token = "words")
-
-# we want to predict sentences, so we need to first split into sentences
+# sentence tokenization
 tidy_sona_sentences <- sona %>% 
   unnest_tokens(text, speech, token = "sentences")
-
-# exercise: add an ID variable for sentences and tokenize each sentence by words
+# add an ID variable for sentences
 tidy_sona_sentences <- tidy_sona_sentences %>%
   mutate(sentence_id = row_number() )
 
+# word tokenization
 tidy_sona_words <- tidy_sona_sentences %>% 
-  unnest_tokens(word, text, token = "words")
+  unnest_tokens(word, text, token = "words") %>% 
+  filter(!word %in% stop_words$word, str_detect(word, "[a-z]"))  # remove stop words
+
+# bigram tokenization
+bigrams <- tidy_sona_sentences %>% 
+  unnest_tokens(bigram, text, token = "ngrams", n = 2)
+# separate the bigrams 
+bigrams_separated <- tidy_sona_bigrams %>%
+  separate(bigram, c("word1", "word2"), sep = " ")
+# remove stop words
+bigrams_filtered <- bigrams_separated %>%
+  filter(!word1 %in% stop_words$word) %>%
+  filter(!word2 %in% stop_words$word)
+# join up the bigrams again
+tidy_sona_bigrams <- bigrams_filtered %>%
+  unite(bigram, word1, word2, sep = " ")
 
 # view data
 View(tidy_sona_sentences)
 View(tidy_sona_words)
+View(tidy_sona_bigrams)
+
+```
+
+
+
+## Descriptive Statistics
+
+### Average number of words used per President
+
+```{r descPres}
+
+# speeches
+speech_count <- tidy_sona_words %>%
+  group_by(year, president) %>%
+  count() %>% 
+  group_by(president) %>% 
+  summarise(num_speeches = n())
+
+# avg words per president
+avg_word_count <- tidy_sona_words %>%
+  group_by(president) %>% 
+  summarise(num_words = n()) %>% 
+  left_join(speech_count) %>% 
+  mutate(avg_words = round((num_words/num_speeches),0)) %>% 
+  arrange(desc(avg_words))
+
+# plot avg words per president
+avg_word_count %>%
+  ungroup(avg_words, president) %>%
+  mutate(avg_words = color_bar("lightblue")(avg_words)) %>%
+  kable("html", escape = FALSE, align = "l", caption = "Average number of words used per President") %>%
+  kable_styling(bootstrap_options = 
+                  c("striped", "condensed", "bordered"), 
+                  full_width = FALSE)
+
+```
+
+
+
+### Number of words used per SONA
+
+```{r descSONA}
+
+# per SONA
+word_count <- tidy_sona_words %>%
+  group_by(filename, year, president) %>%
+  summarise(num_words = n()) %>%
+  arrange(desc(num_words)) 
+
+# plot words per SONA
+word_count %>%
+  ggplot(aes(x = as.numeric(year), y = num_words, colour = president)) +
+  geom_point() + 
+  geom_smooth(method = "loess", aes(colour = president))
 
 ```
 
@@ -87,17 +194,29 @@ View(tidy_sona_words)
 
 ```{r bing}
 
-tidy_sona_words %>%
+# average sentiment per president
+avg_sentiment <- tidy_sona_words %>%
   inner_join(get_sentiments("bing")) %>%
+  group_by(president) %>% 
   count(sentiment) %>%
   spread(sentiment, n, fill = 0) %>%
   mutate(sentiment = positive - negative,
-         avg_sentiment = (positive - negative) / nrow(tidy_sona_words) * 100)
+         avg_sentiment = round( (sentiment / (positive + negative) * 100), 2)) %>% 
+  arrange(desc(avg_sentiment))
+
+# plot avg words per president
+avg_sentiment %>%
+  ungroup(avg_sentiment, president) %>%
+  mutate(avg_sentiment = color_bar("lightblue")(avg_sentiment)) %>%
+  kable("html", escape = FALSE, align = "l", caption = "Average sentiment per President") %>%
+  kable_styling(bootstrap_options = 
+                  c("striped", "condensed", "bordered"), 
+                  full_width = FALSE)
 
 ```
 
 
-### What are the positive words most used
+### What are the positive words most used?
 
 ```{r}
 
@@ -112,7 +231,32 @@ tidy_sona_words %>%
 ```
 
 
-### What are the negative words most used
+## How many of the positive words most used were used by each president?
+
+```{r}
+
+total_speeches <- tidy_sona_words %>% 
+                 group_by(president) %>% 
+                 summarise(total = n())
+
+tidy_sona_words %>%
+  inner_join(get_sentiments("bing")) %>% 
+  filter(sentiment == "positive") %>%
+  group_by(president) %>%
+  count(word, sort = TRUE) %>%
+  left_join(total_speeches) %>% 
+  mutate(freq = n/total) %>% 
+  filter(rank(desc(freq)) <= 20) %>%
+  ggplot(aes(reorder(word,freq), freq, fill = president)) + 
+  geom_col() + 
+  coord_flip() + 
+    xlab("") +
+  facet_grid(.~ president)
+
+```
+
+
+### What are the negative words most used?
 
 ```{r}
 
@@ -127,10 +271,30 @@ tidy_sona_words %>%
 ```
 
 
+## How many of the negative words most used were used by each president?
+
+```{r}
+
+tidy_sona_words %>%
+  inner_join(get_sentiments("bing")) %>% 
+  filter(sentiment == "negative") %>%
+  group_by(president) %>%
+  count(word, sort = TRUE) %>%
+  left_join(total_speeches) %>% 
+  mutate(freq = n/total) %>% 
+  filter(rank(desc(freq)) <= 20) %>%
+  ggplot(aes(reorder(word,freq), freq, fill = president)) + 
+  geom_col() + 
+  coord_flip() + 
+    xlab("") +
+  facet_grid(.~ president)
+  
+```
+
 
 ## How does sentiment change over time?
 
-```{r}
+```{r trends}
 
 sentiments_per_year <- tidy_sona_words %>%
   inner_join(get_sentiments("bing")) %>%
@@ -152,6 +316,72 @@ ggplot(filter(sentiments_per_year), aes(x = year, y = n, fill = sentiment)) +
 # plot proportion of positive and negative words used
 ggplot(filter(sentiments_per_year), aes(x = year, y = freq, fill = sentiment)) +
   geom_col()
+
+```
+
+
+
+## Change in Sentiment over time
+
+```{r}
+
+year_total <- tidy_sona_words %>% 
+  group_by(year) %>% 
+  count() %>% 
+  rename(total = n)
+
+# per year
+sentiments_per_year <- tidy_sona_words %>%
+  inner_join(get_sentiments("bing")) %>%
+  group_by(year) %>% 
+  count(sentiment) %>%
+  left_join(year_total) %>% 
+  mutate(freq = n / total * 100)
+
+sentiments_per_year %>%
+  ggplot(aes(x = as.numeric(year), y = freq, colour = sentiment)) +
+  geom_point() + 
+  geom_smooth(method = "loess", aes(colour = sentiment))
+
+```
+
+
+
+## Change in Sentiment over time
+
+```{r}
+
+year_total <- tidy_sona_words %>% 
+  group_by(year) %>% 
+  count() %>% 
+  rename(total = n)
+
+# per year
+sentiments_per_year <- tidy_sona_words %>%
+  inner_join(get_sentiments("bing")) %>%
+  group_by(year, president) %>% 
+  count(sentiment) %>%
+  spread(key = sentiment, value = n) %>% 
+  left_join(year_total) %>% 
+  mutate(sentiment = positive - negative,
+         avg_sentiment = sentiment / (positive + negative) * 100)
+
+sentiments_per_year %>%
+  ggplot(aes(x = as.numeric(year), y = sentiment, colour = president)) +
+  geom_point() + 
+  geom_smooth(method = "loess", aes(colour = sentiment))
+
+
+```
+
+
+
+## How can we be sure whether average sentiment is increasing over time?
+
+```{r}
+
+model <- lm(avg_sentiment ~ as.numeric(year), data = sentiments_per_year)
+summary(model)
 
 ```
 
@@ -194,15 +424,26 @@ tidy_sona_words %>%
 ```
 
 ## STILL TO DO:
-## Aggregating sentiment over words
-## Dealing with Negation
-## Per President
+## Bigrams
+## Dealing with negation
+## Model significance
+
 
 ```{r}
 
 
 
-
 ```
+
+
+
+## References
+
+https://www.kaggle.com/rtatman/tutorial-sentiment-analysis-in-r
+
+https://www.datacamp.com/community/tutorials/sentiment-analysis-R
+
+
+
 
 
