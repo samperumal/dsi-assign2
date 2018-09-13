@@ -15,7 +15,7 @@ library(keras)
 library(tidyverse)
 library(tidytext)
 ```
-
+Data prep
 ```{r}
 txt_files <- list.files("~/Downloads/sona-text-1994-2018/")
 
@@ -57,7 +57,7 @@ sona$presidents = gsub(".*[_]([^.]+)[.].*", "\\1", (sona$filename))
 
 df = tibble::rowid_to_column(sona, "ID")
 ```
-
+Prepare the word counts data
 ```{r}
 president_word_count = df %>%
   group_by(presidents) %>%
@@ -86,7 +86,7 @@ training_sona <- bag_of_words %>%
 test_sona <- bag_of_words %>% 
   anti_join(training_ids, by = "ID") %>%
   select(-ID)
-
+nrow(bag_of_words)
 ```
 
 ### Data preparation for NN
@@ -117,44 +117,17 @@ y_train = (response_tokenizer$texts_to_matrix(labels_train, mode = "binary"))[,-
 
 ### Basic feed-forward neural network
 
-#### Create the model
-
-
-Creating an empty sequential model:
-
-
-```{r}
-model <- keras_model_sequential()
-```
-
 #### Define the model
 
-Define a model by sequentially adding layers.
-
-
 ```{r}
-model <- keras_model_sequential()
+model <- keras_model_sequential() #Creating an empty sequential model
 
-model %>% 
-  layer_dense(units = 256,                  # number of neurons in the hidden layer
-              input_shape = c(10625), kernel_regularizer = regularizer_l2(l = 0.002)) %>%    # dimension of input array
-  layer_activation('relu') %>% 
-  layer_dense(units = 128, kernel_regularizer = regularizer_l2(l = 0.001)) %>%
-  layer_dropout(0.3) %>%
-  layer_activation("relu") %>%
-  layer_dense(units = 64, kernel_regularizer = regularizer_l2(l = 0.001)) %>%
-  layer_dropout(0.1) %>%
-  layer_activation("relu") %>%
-  layer_dense(32, kernel_regularizer = regularizer_l2(l = 0.001)) %>%
-  layer_dropout(0.1) %>%
-  layer_activation("relu") %>%
-  layer_dense(32, kernel_regularizer = regularizer_l2(l = 0.001)) %>%
-  layer_dropout(0.1) %>%
-  layer_activation("relu") %>%
-  layer_dense(president_count, kernel_regularizer = regularizer_l2(l = 0.001)) %>%  
-  # single unit output layer
-  layer_activation("softmax")
+#Define a model by sequentially adding layers.
 
+model %>%
+  layer_dense(units = 16, activation = 'relu', input_shape = ncol(x_train)) %>%
+  layer_dense(units = 16, activation = 'relu', kernel_regularizer = regularizer_l1_l2(l1 = 0.01, l2 = 0.01)) %>%
+  layer_dense(units = 6, activation = 'softmax')
 
 ```
 
@@ -207,20 +180,17 @@ Adding additional layers is straightforward in Keras. In this secton we build a 
 #### Create the model with compiling
 
 ```{r}
-model2 <- keras_model_sequential()
+model <- keras_model_sequential() #Creating an empty sequential model
 
+#Define a model by sequentially adding layers.
 
-model2 %>% 
-  layer_dense(units = 256, input_shape = ncol(x_train), kernel_regularizer = regularizer_l1_l2(l1 = 0.001, l2 = 0.001)) %>% 
-  layer_activation_leaky_relu() %>% 
-  layer_dropout(rate = 0.3) %>% 
-  layer_dense(units = 128) %>%
-  layer_activation_leaky_relu() %>% 
-  layer_dropout(rate = 0.1) %>%
-  layer_dense(units = 6, activation = 'softmax') %>% 
+model %>%
+  layer_dense(units = 16, activation = 'relu', input_shape = ncol(x_train)) %>%
+  layer_dense(units = 16, activation = 'relu', kernel_regularizer = regularizer_l1_l2(l1 = 0.01, l2 = 0.01), bias_initializer = initializer_glorot_normal()) %>%
+  layer_dense(units = 6, activation = 'softmax') %>%
   compile(
     loss = 'categorical_crossentropy',
-    optimizer = optimizer_rmsprop(lr = 0.001),
+    optimizer = optimizer_rmsprop(lr = 0.003),
     metrics = c('accuracy')
   )
 
@@ -244,3 +214,93 @@ model2 %>% fit(x_train, y_train, epochs = 10, batch_size = 32) %>% plot()
 ```{r}
 model2 %>% evaluate(x_test, y_test, batch_size=32, verbose = 1)
 ```
+
+```{r}
+#Create the data for tf-idf mm model
+
+tidy_sona = df %>%
+  unnest_tokens(word, text, token = "words") %>% 
+  select(ID, word, filename, year, presidents) 
+
+sona_tdf <- tidy_sona %>%
+  group_by(ID,word) %>%
+  count() %>%  
+  group_by(ID) %>%
+  mutate(total = sum(n)) %>%
+  ungroup()
+
+sona_tf_idf <- sona_tdf %>% 
+  bind_tf_idf(word, ID, n) # replace with values from tidytext
+
+sona_tf_idf = sona_tf_idf %>% left_join(df)
+
+# Spreading the data
+bag_of_words <- sona_tf_idf %>% 
+  select(ID, prez = presidents, word, tf_idf) %>%  # note the change, using tf-idf
+  spread(key = word, value = tf_idf, fill = 0) %>%  
+  left_join(df %>% select(ID, prez = presidents))
+
+set.seed(321)
+training_ids <- bag_of_words %>% 
+  group_by(prez) %>% 
+  sample_frac(0.9) %>% 
+  ungroup() %>%
+  select(ID)
+
+training_sona <- bag_of_words %>% 
+  right_join(training_ids, by = "ID") %>%
+  select(-ID)
+
+test_sona <- bag_of_words %>% 
+  anti_join(training_ids, by = "ID") %>%
+  select(-ID)
+```
+
+```{r}
+# Seperate response variable
+dim(training_sona) #6626 rows 10626 cols
+x_train <- as.matrix(training_sona %>% select(-prez))
+x_test <- as.matrix(test_sona %>% select(-prez), ncol = 10625)
+
+#One-hot encoding for response variable
+labels_test = test_sona %>% select(prez) %>% unlist()
+president_count = labels_test %>% as_tibble() %>% unique() %>% count()
+response_tokenizer = text_tokenizer(num_words = president_count + 1)
+response_tokenizer$fit_on_texts(labels_test)
+# Extract response vector, ignoring first (empty) column
+y_test = (response_tokenizer$texts_to_matrix(labels_test, mode = "binary"))[,-1]
+
+labels_train = training_sona %>% select(prez) %>% unlist()
+president_count = labels_train %>% as_tibble() %>% unique() %>% count()
+response_tokenizer = text_tokenizer(num_words = president_count + 1)
+response_tokenizer$fit_on_texts(labels_train)
+# Extract response vector, ignoring first (empty) column
+y_train = (response_tokenizer$texts_to_matrix(labels_train, mode = "binary"))[,-1]
+
+```
+
+```{r}
+model <- keras_model_sequential() #Creating an empty sequential model
+
+#Define a model by sequentially adding layers.
+
+model %>%
+  layer_dense(units = 16, activation = 'relu', input_shape = ncol(x_train)) %>%
+  layer_dense(units = 16, activation = 'relu', kernel_regularizer = regularizer_l1_l2(l1 = 0.01, l2 = 0.01), bias_initializer = initializer_glorot_normal()) %>%
+  layer_dense(units = 6, activation = 'softmax') %>%
+  compile(
+    loss = 'categorical_crossentropy',
+    optimizer = optimizer_rmsprop(lr = 0.003),
+    metrics = c('accuracy')
+  )
+
+```
+
+```{r}
+model %>% fit(x_train, y_train, epochs = 10, batch_size = 32) %>% plot()
+```
+
+```{r}
+model %>% evaluate(x_test, y_test, batch_size=32, verbose = 1) 
+```
+
