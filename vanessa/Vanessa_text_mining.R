@@ -3,13 +3,13 @@ library(tidytext)
 
 
 #read data in
-txt_files <- list.files("data/")
+txt_files <- list.files("sona-text-1994-2018/")
 
 #need to delete that .M file for this to work.
 #loop to read in file
 sona <- data.frame(filename = as.character(), speech = as.character())
 for(i in txt_files){
-  file_name <- paste0("data/", i)
+  file_name <- paste0("sona-text-1994-2018/", i)
   
   # import text as single character string (can also read.table but the "seperator" causes problems)
   this_speech <- readChar(file_name, 
