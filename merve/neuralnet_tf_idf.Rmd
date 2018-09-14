@@ -56,6 +56,7 @@ sona$presidents = gsub(".*[_]([^.]+)[.].*", "\\1", (sona$filename))
 # exercise: add an ID variable for sentences and tokenize each sentence by words
 
 df = tibble::rowid_to_column(sona, "ID")
+
 ```
 Prepare the word counts data
 ```{r}
@@ -302,5 +303,54 @@ model %>% fit(x_train, y_train, epochs = 10, batch_size = 32) %>% plot()
 
 ```{r}
 model %>% evaluate(x_test, y_test, batch_size=32, verbose = 1) 
+```
+
+```{r}
+# data(stop_words)
+# sona_tdf <- sona_tdf %>% anti_join(stop_words,by=c("word"="word"))
+
+# Document term maatrix cast_dtm()
+dtm_sona <- sona_tdf %>% 
+  cast_dtm(ID, word, n)
+
+sona_lda <- LDA(dtm_sona, k = 6, control = list(seed = 1234))
+sona_lda
+
+term <- as.character(sona_lda@terms)
+topic1 <- sona_lda@beta[1,]
+topic2 <- sona_lda@beta[2,]
+topic3 <- sona_lda@beta[3,]
+topic4 <- sona_lda@beta[4,]
+topic5 <- sona_lda@beta[5,]
+topic6 <- sona_lda@beta[6,]
+
+
+sona_topics <- tibble(term = term, topic1 = topic1, topic2 = topic2, topic3 = topic3,
+                      topic4 = topic4, topic5 = topic5, topic6 = topic6)
+
+
+# sona_topics <- sona_topics %>%
+#   gather(topic1, topic2, topic3, topic4, topic5,topic6, key = "topic", value = "beta") %>%
+#   mutate(beta = exp(beta)) # pr(topic k generates word i) = exp(beta_ik)
+# head(sona_topics)
+
+
+sona_tf_idf %>% 
+  select(ID, prez = presidents, word, tf_idf) %>%  # note the change, using tf-idf
+  spread(key = word, value = tf_idf, fill = 0) %>%  
+  left_join(df %>% select(ID, prez = presidents))
+
+reviews_gamma <- df %>% 
+    left_join(tidy(sona_lda, matrix = "gamma") %>% 
+    mutate(ID = as.numeric(document)) %>% # some cleaning to make key variable (reviewId) usable
+    select(-document) %>%
+    spread(key = topic, value = gamma, sep = "_"))
+
+sona_topic_model = tidy(sona_lda, matrix = "gamma") %>% 
+    mutate(ID = as.character(document)) %>% # some cleaning to make key variable (reviewId) usable
+    select(-document)
+reviews_gamma <- df %>% 
+    left_join(sona_topic_model) %>%
+    spread(key = topic, value = gamma, sep = "_")
 ```
 
