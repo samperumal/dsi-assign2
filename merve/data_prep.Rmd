@@ -70,11 +70,15 @@ colnames(df)[1] <- "sentence_id"
 
 sentence_word_count = df %>%
   unnest_tokens(word, text) %>%
-  count(sentence_id, word, sort = FALSE)
+  count(sentence_id, word, sort = FALSE) %>%
+ungroup() %>% 
+  arrange(desc(n))
+
 
 #Join to get the file name (response)
 sentence_word_count = left_join(sentence_word_count, df)
-colnames(sentence_word_count[4]) <- "response"
+sentence_word_count$filename = gsub(".*[_]([^.]+)[.].*", "\\1", sentence_word_count$filename)
+
 
 #Removing the stop words
 #data(stop_words)
@@ -86,13 +90,14 @@ colnames(sentence_word_count[4]) <- "response"
  
 # exercise: reshape long to wide to get into usual format for predictive models 
 #Turning long format into wide
-words_wide <- sentence_word_count %>% spread(key = "word", value = "n")
+# words_wide <- sentence_word_count %>% spread(key = "word", value = "n")
+
 
 ```
 
 ```{r}
 #Bind tf_idf
-tidy_sona <- tidy_sona %>%
+tidy_sona <- sentence_word_count %>%
   bind_tf_idf(word, filename, n)
 tidy_sona
 
@@ -100,12 +105,38 @@ tidy_sona %>%
   select(-year) %>%
   arrange(desc(tf_idf))
 
+table(sentence_word_count$filename)
+
+
 ```
 
 ```{r}
-gsub("as.character(0-9+_post_elections_).*", "\\1", tidy_sona$filename)
-sub("1994_post_elections_.*", " ", as.character(tidy_sona$filename))
-
+(min_class_size <- min(table(sentence_word_count$filename)))
 ```
+
+```{r}
+sentence_word_count_new <- sentence_word_count %>% group_by(filename) %>% sample_n(min_class_size) %>% ungroup()
+(table(sentence_word_count_new$filename))
+```
+
+```{r}
+set.seed(321)
+training_ids <- sentence_word_count_new %>% 
+  group_by(filename) %>% 
+  sample_frac(0.7) %>% 
+  ungroup() %>%
+  select(sentence_id)
+
+training_sentences <- sentence_word_count_new %>% 
+  right_join(training_ids, by = "sentence_id") %>%
+
+test_sentences <- sentence_word_count_new %>% 
+  anti_join(training_ids, by = "sentence_id") %>%
+```
+
+```{r}
+fit <- rpart(factor(sentence_word_count$filename) ~ ., training_sentences)
+```
+
 
 

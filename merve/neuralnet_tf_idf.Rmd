@@ -1,0 +1,356 @@
+---
+title: "Neural networks with tf-idf using keras"
+author: "Merve Aydin Chester"
+date: ""
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(keras)
+library(tidyverse)
+library(tidytext)
+```
+Data prep
+```{r}
+txt_files <- list.files("~/Downloads/sona-text-1994-2018/")
+
+sona <- data.frame(filename = as.character(), speech = as.character())
+for(i in txt_files){
+  file_name <- paste0("~/Downloads/sona-text-1994-2018/", i)
+  
+  # import text as single character string (can also read.table but the "seperator" causes problems)
+  this_speech <- readChar(file_name, 
+                          nchars = file.info(file_name)$size)
+  
+  # make data frame with metadata (filename contains year and pres) and speech
+  this_sona <- data.frame(filename = i, speech = this_speech, stringsAsFactors = FALSE)
+  
+  # make a single dataset
+  sona <- rbind(sona, this_sona)
+}
+
+# extract year, testing
+str_extract(sona$filename, "[0-9]")
+str_extract_all(sona$filename, "[0-90-90-90-9]")
+str_extract_all(sona$filename, "[0-9][0-9][0-9][0-9]")
+str_extract_all(sona$filename, "[0-9][0-9][0-9][0-9]", simplify = T)
+str_extract(sona$filename, "[0-9]{4}")
+
+# does the same thing
+str_sub(sona$filename, start = 1, end = 4)
+
+sona$year <- str_sub(sona$filename, start = 1, end = 4)
+
+
+# unnest_tokens is very useful, can split into words, sentences, lines, paragraphs, etc
+
+# we want to predict sentences, so we need to first split into sentences
+sona = sona %>% unnest_tokens(text, speech, token = "sentences")
+sona$presidents = gsub(".*[_]([^.]+)[.].*", "\\1", (sona$filename))
+
+# exercise: add an ID variable for sentences and tokenize each sentence by words
+
+df = tibble::rowid_to_column(sona, "ID")
+
+```
+Prepare the word counts data
+```{r}
+president_word_count = df %>%
+  group_by(presidents) %>%
+  unnest_tokens(word, text) %>%
+  count(ID, word, sort = TRUE) %>%
+  ungroup()
+  
+#Join to get the file name and presidents
+president_word_count = left_join(president_word_count, df)
+
+bag_of_words <- president_word_count %>% 
+  select(ID, prez = presidents,  word,n) %>% 
+  spread(key = word, value = n, fill = 0)
+
+set.seed(321)
+training_ids <- bag_of_words %>% 
+  group_by(prez) %>% 
+  sample_frac(0.9) %>% 
+  ungroup() %>%
+  select(ID)
+
+training_sona <- bag_of_words %>% 
+  right_join(training_ids, by = "ID") %>%
+  select(-ID)
+
+test_sona <- bag_of_words %>% 
+  anti_join(training_ids, by = "ID") %>%
+  select(-ID)
+nrow(bag_of_words)
+```
+
+### Data preparation for NN
+
+
+```{r}
+# Seperate response variable
+dim(training_sona) #6626 rows 10626 cols
+x_train <- as.matrix(training_sona %>% select(-prez))
+x_test <- as.matrix(test_sona %>% select(-prez), ncol = 10625)
+
+#One-hot encoding for response variable
+labels_test = test_sona %>% select(prez) %>% unlist()
+president_count = labels_test %>% as_tibble() %>% unique() %>% count()
+response_tokenizer = text_tokenizer(num_words = president_count + 1)
+response_tokenizer$fit_on_texts(labels_test)
+# Extract response vector, ignoring first (empty) column
+y_test = (response_tokenizer$texts_to_matrix(labels_test, mode = "binary"))[,-1]
+
+labels_train = training_sona %>% select(prez) %>% unlist()
+president_count = labels_train %>% as_tibble() %>% unique() %>% count()
+response_tokenizer = text_tokenizer(num_words = president_count + 1)
+response_tokenizer$fit_on_texts(labels_train)
+# Extract response vector, ignoring first (empty) column
+y_train = (response_tokenizer$texts_to_matrix(labels_train, mode = "binary"))[,-1]
+```
+
+
+### Basic feed-forward neural network
+
+#### Define the model
+
+```{r}
+model <- keras_model_sequential() #Creating an empty sequential model
+
+#Define a model by sequentially adding layers.
+
+model %>%
+  layer_dense(units = 16, activation = 'relu', input_shape = ncol(x_train)) %>%
+  layer_dense(units = 16, activation = 'relu', kernel_regularizer = regularizer_l1_l2(l1 = 0.01, l2 = 0.01)) %>%
+  layer_dense(units = 6, activation = 'softmax')
+
+```
+
+
+```{r}
+summary(model)
+```
+
+#### Compile the model 
+
+
+```{r}
+model %>% compile(
+  optimizer = 'rmsprop',
+  loss = 'categorical_crossentropy',
+  metrics = c('accuracy')
+)
+```
+
+We could have done the define and compile steps together, using the pipe, if we wanted to:
+
+
+```{r}
+model %>% fit(x_train, y_train, epochs = 10, batch_size = 32, validation_data = list(x_test, y_test)
+) %>% plot()
+```
+
+#### Evaluate the model 
+
+Once the model is trained, we can evaluate its performance on the test data.
+
+
+```{r}
+model %>% evaluate(x_test, y_test, batch_size=32, verbose = 1)
+```
+
+#### Generate predictions on new data (e.g. test data)
+
+This is done in a straightforward way by passing new data to `predict_classes()`
+
+
+```{r}
+model %>% predict_classes(x_test) %>% head()
+```
+
+### Adding more layers = Deep learning
+
+Adding additional layers is straightforward in Keras. In this secton we build a model with two (rather than one) hidden layers. This model has the same number of hidden nodes as the previous model, half in each of the hidden layers. We use the same steps as before, so just give the headings.
+
+#### Create the model with compiling
+
+```{r}
+model <- keras_model_sequential() #Creating an empty sequential model
+
+#Define a model by sequentially adding layers.
+
+model %>%
+  layer_dense(units = 16, activation = 'relu', input_shape = ncol(x_train)) %>%
+  layer_dense(units = 16, activation = 'relu', kernel_regularizer = regularizer_l1_l2(l1 = 0.01, l2 = 0.01), bias_initializer = initializer_glorot_normal()) %>%
+  layer_dense(units = 6, activation = 'softmax') %>%
+  compile(
+    loss = 'categorical_crossentropy',
+    optimizer = optimizer_rmsprop(lr = 0.003),
+    metrics = c('accuracy')
+  )
+
+```
+
+
+```{r}
+summary(model2)
+```
+
+#### Train the model
+
+
+```{r}
+model2 %>% fit(x_train, y_train, epochs = 10, batch_size = 32) %>% plot()
+
+```
+
+#### Evaluate the model 
+
+```{r}
+model2 %>% evaluate(x_test, y_test, batch_size=32, verbose = 1)
+```
+
+```{r}
+#Create the data for tf-idf mm model
+
+tidy_sona = df %>%
+  unnest_tokens(word, text, token = "words") %>% 
+  select(ID, word, filename, year, presidents) 
+
+sona_tdf <- tidy_sona %>%
+  group_by(ID,word) %>%
+  count() %>%  
+  group_by(ID) %>%
+  mutate(total = sum(n)) %>%
+  ungroup()
+
+sona_tf_idf <- sona_tdf %>% 
+  bind_tf_idf(word, ID, n) # replace with values from tidytext
+
+sona_tf_idf = sona_tf_idf %>% left_join(df)
+
+# Spreading the data
+bag_of_words <- sona_tf_idf %>% 
+  select(ID, prez = presidents, word, tf_idf) %>%  # note the change, using tf-idf
+  spread(key = word, value = tf_idf, fill = 0) %>%  
+  left_join(df %>% select(ID, prez = presidents))
+
+set.seed(321)
+training_ids <- bag_of_words %>% 
+  group_by(prez) %>% 
+  sample_frac(0.9) %>% 
+  ungroup() %>%
+  select(ID)
+
+training_sona <- bag_of_words %>% 
+  right_join(training_ids, by = "ID") %>%
+  select(-ID)
+
+test_sona <- bag_of_words %>% 
+  anti_join(training_ids, by = "ID") %>%
+  select(-ID)
+```
+
+```{r}
+# Seperate response variable
+dim(training_sona) #6626 rows 10626 cols
+x_train <- as.matrix(training_sona %>% select(-prez))
+x_test <- as.matrix(test_sona %>% select(-prez), ncol = 10625)
+
+#One-hot encoding for response variable
+labels_test = test_sona %>% select(prez) %>% unlist()
+president_count = labels_test %>% as_tibble() %>% unique() %>% count()
+response_tokenizer = text_tokenizer(num_words = president_count + 1)
+response_tokenizer$fit_on_texts(labels_test)
+# Extract response vector, ignoring first (empty) column
+y_test = (response_tokenizer$texts_to_matrix(labels_test, mode = "binary"))[,-1]
+
+labels_train = training_sona %>% select(prez) %>% unlist()
+president_count = labels_train %>% as_tibble() %>% unique() %>% count()
+response_tokenizer = text_tokenizer(num_words = president_count + 1)
+response_tokenizer$fit_on_texts(labels_train)
+# Extract response vector, ignoring first (empty) column
+y_train = (response_tokenizer$texts_to_matrix(labels_train, mode = "binary"))[,-1]
+
+```
+
+```{r}
+model <- keras_model_sequential() #Creating an empty sequential model
+
+#Define a model by sequentially adding layers.
+
+model %>%
+  layer_dense(units = 16, activation = 'relu', input_shape = ncol(x_train)) %>%
+  layer_dense(units = 16, activation = 'relu', kernel_regularizer = regularizer_l1_l2(l1 = 0.01, l2 = 0.01), bias_initializer = initializer_glorot_normal()) %>%
+  layer_dense(units = 6, activation = 'softmax') %>%
+  compile(
+    loss = 'categorical_crossentropy',
+    optimizer = optimizer_rmsprop(lr = 0.003),
+    metrics = c('accuracy')
+  )
+
+```
+
+```{r}
+model %>% fit(x_train, y_train, epochs = 10, batch_size = 32) %>% plot()
+```
+
+```{r}
+model %>% evaluate(x_test, y_test, batch_size=32, verbose = 1) 
+```
+
+```{r}
+# data(stop_words)
+# sona_tdf <- sona_tdf %>% anti_join(stop_words,by=c("word"="word"))
+
+# Document term maatrix cast_dtm()
+dtm_sona <- sona_tdf %>% 
+  cast_dtm(ID, word, n)
+
+sona_lda <- LDA(dtm_sona, k = 6, control = list(seed = 1234))
+sona_lda
+
+term <- as.character(sona_lda@terms)
+topic1 <- sona_lda@beta[1,]
+topic2 <- sona_lda@beta[2,]
+topic3 <- sona_lda@beta[3,]
+topic4 <- sona_lda@beta[4,]
+topic5 <- sona_lda@beta[5,]
+topic6 <- sona_lda@beta[6,]
+
+
+sona_topics <- tibble(term = term, topic1 = topic1, topic2 = topic2, topic3 = topic3,
+                      topic4 = topic4, topic5 = topic5, topic6 = topic6)
+
+
+# sona_topics <- sona_topics %>%
+#   gather(topic1, topic2, topic3, topic4, topic5,topic6, key = "topic", value = "beta") %>%
+#   mutate(beta = exp(beta)) # pr(topic k generates word i) = exp(beta_ik)
+# head(sona_topics)
+
+
+sona_tf_idf %>% 
+  select(ID, prez = presidents, word, tf_idf) %>%  # note the change, using tf-idf
+  spread(key = word, value = tf_idf, fill = 0) %>%  
+  left_join(df %>% select(ID, prez = presidents))
+
+reviews_gamma <- df %>% 
+    left_join(tidy(sona_lda, matrix = "gamma") %>% 
+    mutate(ID = as.numeric(document)) %>% # some cleaning to make key variable (reviewId) usable
+    select(-document) %>%
+    spread(key = topic, value = gamma, sep = "_"))
+
+sona_topic_model = tidy(sona_lda, matrix = "gamma") %>% 
+    mutate(ID = as.character(document)) %>% # some cleaning to make key variable (reviewId) usable
+    select(-document)
+reviews_gamma <- df %>% 
+    left_join(sona_topic_model) %>%
+    spread(key = topic, value = gamma, sep = "_")
+```
+

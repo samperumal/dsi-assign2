@@ -1,5 +1,5 @@
 ---
-title: "Sentiment_Analysis_AP"
+title: "Sentiment_Analysis"
 author: "Audrey Pentz"
 date: "September 9, 2018"
 output: html_document
@@ -14,8 +14,50 @@ knitr::opts_chunk$set(
   library(tidytext),
   library(stringr),
   library(lubridate),
-  library(qdap)
+  library(qdap),
+  library(knitr)
 )
+
+my_colors <- c("#E69F00", "#56B4E9", "#009E73", "#CC79A7", "#D55E00", "#D65E00")
+
+library(widyr)                  # For pairwise correlation
+
+# Visualizations
+library(ggrepel)                # geom_label_repel
+library(gridExtra)              # grid.arrange for multi-graphs
+library(kableExtra)             # tables
+library(formattable)            # color_tile
+library(circlize)               # chord diagram
+library(memery)                 # images with plots
+library(magick)                 # images with plots (image_read)
+library(yarrr)                  # pirate plot
+library(radarchart)             # radar chart
+library(igraph)                 # network diagrams
+library(ggraph)                 # network diagrams
+
+
+# Define some colors to use
+my_colors <- c("#E69F00", "#56B4E9", "#009E73", "#CC79A7", "#D55E00", "#D65E00")
+
+# Customize ggplot2's default theme settings
+theme_sentiment <- function(aticks = element_blank(),
+                         pgminor = element_blank(),
+                         lt = element_blank(),
+                         lp = "none")
+{
+  theme(plot.title = element_text(hjust = 0.5), # Center the title
+        axis.ticks = aticks,                    # Set axis ticks to on or off
+        panel.grid.minor = pgminor,             # Turn the minor grid lines on or off
+        legend.title = lt,                      # Turn the legend title on or off
+        legend.position = lp)                   # Turn the legend on or off
+}
+
+# Customize the text tables for consistency using HTML formatting
+my_kable_styling <- function(dat, caption) {
+  kable(dat, "html", escape = FALSE, caption = caption) %>%
+  kable_styling(bootstrap_options = c("striped", "condensed", "bordered"),
+                full_width = FALSE)
+}
 
 ```
 
@@ -23,7 +65,7 @@ knitr::opts_chunk$set(
 
 ## Read in the Data
 
-```{r}
+```{r import}
 
 txt_files <- list.files("../sona-text-1994-2018/")
 
@@ -53,84 +95,322 @@ sona$president <- unlist(str_extract_all(sona$filename, '(?<=_)[^_]+(?=.txt)'))
 
 
 
-## Tokenize by Sentences and Words
+## Remove Stop Words and Tokenize by Sentences, Words and Bigrams
 
-```{r}
+```{r tokenize}
 
-# unnest_tokens is very useful, can split into words, sentences, lines, paragraphs, etc
-
-# word tokenization
-# sona %>% unnest_tokens(text, speech, token = "words")
-
-# we want to predict sentences, so we need to first split into sentences
+# sentence tokenization
 tidy_sona_sentences <- sona %>% 
   unnest_tokens(text, speech, token = "sentences")
-
-# exercise: add an ID variable for sentences and tokenize each sentence by words
+# add an ID variable for sentences
 tidy_sona_sentences <- tidy_sona_sentences %>%
   mutate(sentence_id = row_number() )
 
+# word tokenization
 tidy_sona_words <- tidy_sona_sentences %>% 
-  unnest_tokens(word, text, token = "words")
+  unnest_tokens(word, text, token = "words") %>% 
+  filter(!word %in% stop_words$word, str_detect(word, "[a-z]"))  # remove stop words
+
+# bigram tokenization
+bigrams <- tidy_sona_sentences %>% 
+  unnest_tokens(bigram, text, token = "ngrams", n = 2)
+# separate the bigrams 
+bigrams_separated <- bigrams %>%
+  separate(bigram, c("word1", "word2"), sep = " ")
+# remove stop words
+bigrams_filtered <- bigrams_separated %>%
+  filter(!word1 %in% stop_words$word) %>%
+  filter(!word2 %in% stop_words$word)
+# join up the bigrams again
+tidy_sona_bigrams <- bigrams_filtered %>%
+  unite(bigram, word1, word2, sep = " ")
 
 # view data
 View(tidy_sona_sentences)
 View(tidy_sona_words)
+View(tidy_sona_bigrams)
 
 ```
 
 
 
-## Sentiment Analysis using "bing" lexicon (positive vs negative words)
+## Descriptive Statistics
 
-### Sentiment Summary
+Each president has made a certain number of SONA speeches, depending on their term in office and whether there was 1 speech that year or 2 in the year of an election (pre and post election). Let's understand the number of words used by each President and how this varies across each SONA speech.
+
+### Average number of words used per President
+
+We need to create a metric called "avg_words" which is simply the total number of words across all SONA speeches made by a particular president, divided by the total number of SONA speeches that president made.
+
+```{r descPres}
+
+# speeches
+speech_count <- tidy_sona_words %>%
+  group_by(year, president) %>%
+  count() %>% 
+  group_by(president) %>% 
+  summarise(num_speeches = n())
+
+# avg words per president
+avg_word_count <- tidy_sona_words %>%
+  group_by(president) %>% 
+  summarise(num_words = n()) %>% 
+  left_join(speech_count) %>% 
+  mutate(avg_words = round((num_words/num_speeches),0)) %>% 
+  arrange(desc(avg_words))
+
+# plot avg words per president
+avg_word_count %>%
+  ungroup(avg_words, president) %>%
+  mutate(avg_words = color_bar("lightblue")(avg_words)) %>%
+  kable("html", escape = FALSE, align = "l", caption = "Average number of words used per President") %>%
+  kable_styling(bootstrap_options = 
+                  c("striped", "condensed", "bordered"), 
+                  full_width = FALSE)
+
+```
+**Insights:** 
+On average, Mbeki used the most words in his SONA speeches, followed by Motlanthe and de Klerk used the least. Mandela and Zuma are ranked in the middle of their peers. The current president used fewer words than all of his post 1994 peers.
+
+
+
+### Number of words used per SONA
+
+```{r descSONA}
+
+# per SONA
+word_count <- tidy_sona_words %>%
+  group_by(filename, year, president) %>%
+  summarise(num_words = n()) %>%
+  arrange(desc(num_words)) 
+
+# plot words per SONA
+word_count %>%
+  ggplot(aes(x = as.numeric(year), y = num_words, colour = president)) +
+  geom_point() + 
+  geom_smooth(method = "loess", aes(colour = president))
+
+```
+**Insights:** 
+Of the 3 presidents that have made more than 1 SONA speech, Mbeki used more words on average than both Mandela and Zuma and the variance in the number of words used per SONA speech is also higher for Mbeki. In 2004, which was an election year, the average number of words Mbeki used was lower in both his pre- and post-election speeches. Towards the end of his term, his average number of words also dropped off. The data suggests that perhaps Mbeki's average number of words is correlated with his confidence in being re-elected President.
+
+
+### Lexical Diversity
+
+Lexical diversity refers to the number of unique words used in each SONA.
+
+```{r diversity}
+
+# word tokenization
+diversity_per_year <- tidy_sona_sentences %>% 
+  unnest_tokens(word, text, token = "words") %>%  # don't remove stop words this time
+  group_by(president, year) %>% 
+  summarise(diversity = n_distinct(word)) %>% 
+  arrange(desc(diversity))
+
+diversity_per_year %>%
+  ggplot(aes(x = as.numeric(year), y = diversity)) +
+  geom_point(color = "steelblue",
+               alpha = .7,               # transparency
+               size = 3,                 # point size
+               position = "jitter") +    # point overlap
+  geom_smooth(method = "loess", colour = "steelblue") +
+  ggtitle("Lexical Diversity") +
+  xlab("year") +
+  ylab("")
+
+```
+
+
+
+### Lexical Density
+
+Lexical density refers to the number of unique words used in each SONA divided by the total number of words and a high value is an indicator of word repitition.
+
+```{r density}
+
+# word tokenization
+density_per_year <- tidy_sona_sentences %>% 
+  unnest_tokens(word, text, token = "words") %>%  # don't remove stop words this time
+  group_by(president, year) %>% 
+  summarise(density = n_distinct(word) / n()) %>% 
+  arrange(desc(density))
+
+density_per_year %>%
+  ggplot(aes(x = as.numeric(year), y = density)) +
+  geom_point(color = "steelblue",
+               alpha = .7,               # transparency
+               size = 3,                 # point size
+               position = "jitter") +    # point overlap
+  geom_smooth(method = "loess", colour = "steelblue") +
+  ggtitle("Lexical Density") +
+  xlab("year") +
+  ylab("")
+
+```
+
+
+
+## Sentiment Analysis using "bing" lexicon
+
+The "bing" lexicon encodes words as either "positive" or "negative". However, not all words used in the SONA speeches are in the lexicon so we need to adjust for this.
+
+### Sentiment per President
+
+Let's understand how many "positive" and "negative" words are used by each president across all their SONA speeches and create a metric called "sentiment" which is simply the total number of positive words minus the total number of negative words. We then adjust for the total number of words used from the lexicon in the "sentiment_score" metric. 
 
 ```{r bing}
 
-tidy_sona_words %>%
+# average sentiment per president
+avg_sentiment <- tidy_sona_words %>%
   inner_join(get_sentiments("bing")) %>%
+  group_by(president) %>% 
   count(sentiment) %>%
   spread(sentiment, n, fill = 0) %>%
   mutate(sentiment = positive - negative,
-         avg_sentiment = (positive - negative) / nrow(tidy_sona_words) * 100)
+         sentiment_score = round( (sentiment / (positive + negative) * 100), 2)) %>% 
+  arrange(desc(sentiment_score))
+
+# plot avg words per president
+avg_sentiment %>%
+  ungroup(sentiment_score, president) %>%
+  mutate(sentiment_score = color_bar("lightblue")(sentiment_score)) %>%
+  kable("html", escape = FALSE, align = "l", caption = "Sentiment Score per President") %>%
+  kable_styling(bootstrap_options = 
+                  c("striped", "condensed", "bordered"), 
+                  full_width = FALSE)
 
 ```
+**Insights:** 
+Of the 3 presidents that have made more than 1 SONA speech, Zuma has the highest sentiment score, followed by Mbeki and then Mandela. Zuma's sentiment score is nearly double Mandela's. It's interesting that the current President has the second highest sentiment score, not far behind Zuma and only slightly ahead of Mbeki.
 
 
-### What are the positive words most used
+
+### What are the 10 positive words most frequently used by each president?
 
 ```{r}
 
-tidy_sona_words %>%
+positive_words <- tidy_sona_words %>%
+  group_by(president) %>% 
   inner_join(get_sentiments("bing")) %>% 
   filter(sentiment == "positive") %>%
   count(word) %>%
   arrange(desc(n)) %>%
-  filter(rank(desc(n)) <= 20) %>%
-  ggplot(aes(reorder(word,n),n)) + geom_col() + coord_flip() + xlab("")
+  group_by(president) %>% 
+  slice(seq_len(10)) %>%
+  ungroup() %>%
+  arrange(president, n) %>%
+  mutate(row = row_number())
+
+positive_words %>%
+  ggplot(aes(x = row, n, fill = president)) +
+    geom_col(show.legend = NULL) +
+    labs(x = NULL, y = "Number of times positive word is used") + 
+    ggtitle("Positive Words most used by each President") +
+    facet_wrap(~president, 
+               ncol = 3, nrow = 3, 
+               scales = "free") +
+    scale_x_continuous( 
+      breaks = positive_words$row, 
+      labels = positive_words$word) +
+    coord_flip()
 
 ```
+**Insights:** 
+De Klerk's most used words were "freedom", "peaceful" and "support" and at least 2 of these 3 come up in all the president's most used words. Mandela's most used words also include "progress", "improve", "reconciliation" and "commitment" which are all words indicating repair and a move towards something better. Mbeki uses many of the same words but also introduces "empowerment" which is a word carried through by Zuma and Ramaphosa and "success" which is carried through by Zuma. These words suggest progress in the move towards repair or something better, per Mandela. Ramaphosa also introduces the words "confidence", "effectively", "enhance" and "efficient", which are words commonly seen in a business context and have not shown up in any other SA president's top 10 most frequently used words in a SONA since 1994.
 
 
-### What are the negative words most used
+
+## Which of the positive words most frequently used are common across presidents?
+
+```{r}
+
+total_speeches <- tidy_sona_words %>% 
+                 group_by(president) %>% 
+                 summarise(total = n())
+
+tidy_sona_words %>%
+  inner_join(get_sentiments("bing")) %>% 
+  filter(sentiment == "positive") %>%
+  group_by(president) %>%
+  count(word, sort = TRUE) %>%
+  left_join(total_speeches) %>% 
+  mutate(freq = n/total) %>% 
+  filter(rank(desc(freq)) <= 15) %>%
+  ggplot(aes(reorder(word,freq), freq, fill = president)) + 
+  geom_col() + 
+  coord_flip() + 
+    xlab("") +
+  facet_grid(.~ president)
+
+```
+**Insights:** 
+Common words across post 1994 presidents include: "freedom", "improve", "support" and "progress". Words introduced by Mandela and unique to his speeches are: "restructuring", "reconciliation" and "contribution". Mbeki introduces the word "integrated" into the top words used and this is unique to his speeches. Zuma uses the words "reform", "pleased", "led" and "sustainable" frequently and other presidents do not. Ramaphosa introduces the words "trust", "recovery", "outstanding", "liberation", "enhance", "efficient", "effective" and "decisive", which have not yet been seen in the any other SA president's top 10 most frequently used words in a SONA since 1994.
+
+
+
+### What are the 10 negative words most used by each president?
+
+```{r negative}
+
+negative_words <- tidy_sona_words %>%
+  group_by(president) %>% 
+  inner_join(get_sentiments("bing")) %>% 
+  filter(sentiment == "negative") %>%
+  count(word) %>%
+  arrange(desc(n)) %>%
+  group_by(president) %>% 
+  slice(seq_len(10)) %>%
+  ungroup() %>%
+  arrange(president, n) %>%
+  mutate(row = row_number())
+
+negative_words %>%
+  ggplot(aes(x = row, n, fill = president)) +
+    geom_col(show.legend = NULL) +
+    labs(x = NULL, y = "Number of times negative word is used") + 
+    ggtitle("Negative Words most used by each President") +
+    facet_wrap(~president, 
+               ncol = 3, nrow = 3, 
+               scales = "free") +
+    scale_x_continuous( 
+      breaks = negative_words$row, 
+      labels = negative_words$word) +
+    coord_flip()
+
+```
+**Insights:** 
+...
+
+
+
+## How many of the negative words most used were used by each president?
 
 ```{r}
 
 tidy_sona_words %>%
   inner_join(get_sentiments("bing")) %>% 
   filter(sentiment == "negative") %>%
-  count(word) %>%
-  arrange(desc(n)) %>%
-  filter(rank(desc(n)) <= 20) %>%
-  ggplot(aes(reorder(word,n),n)) + geom_col() + coord_flip() + xlab("")
-
+  group_by(president) %>%
+  count(word, sort = TRUE) %>%
+  left_join(total_speeches) %>% 
+  mutate(freq = n/total) %>% 
+  filter(rank(desc(freq)) <= 20) %>%
+  ggplot(aes(reorder(word,freq), freq, fill = president)) + 
+  geom_col() + 
+  coord_flip() + 
+    xlab("") +
+  facet_grid(.~ president)
+  
 ```
+**Insights:** 
+...
 
 
 
 ## How does sentiment change over time?
 
-```{r}
+```{r trends}
 
 sentiments_per_year <- tidy_sona_words %>%
   inner_join(get_sentiments("bing")) %>%
@@ -147,13 +427,87 @@ head(sentiments_per_year)
 
 # plot number of positive and negative words used
 ggplot(filter(sentiments_per_year), aes(x = year, y = n, fill = sentiment)) +
-  geom_col()
+  geom_col() + coord_flip()
 
 # plot proportion of positive and negative words used
 ggplot(filter(sentiments_per_year), aes(x = year, y = freq, fill = sentiment)) +
-  geom_col()
+  geom_col() + coord_flip()
 
 ```
+**Insights:** 
+...
+
+
+
+## Change in Sentiment over time
+
+```{r}
+
+year_total <- tidy_sona_words %>% 
+  group_by(year) %>% 
+  count() %>% 
+  rename(total = n)
+
+# per year
+sentiments_per_year <- tidy_sona_words %>%
+  inner_join(get_sentiments("bing")) %>%
+  group_by(year) %>% 
+  count(sentiment) %>%
+  left_join(year_total) %>% 
+  mutate(freq = n / total * 100)
+
+sentiments_per_year %>%
+  ggplot(aes(x = as.numeric(year), y = freq, colour = sentiment)) +
+  geom_point() + 
+  geom_smooth(method = "loess", aes(colour = sentiment))
+
+```
+**Insights:** 
+...
+
+
+
+## Change in Sentiment over time
+
+```{r}
+
+year_total <- tidy_sona_words %>% 
+  group_by(year) %>% 
+  count() %>% 
+  rename(total = n)
+
+# per year
+sentiments_per_year <- tidy_sona_words %>%
+  inner_join(get_sentiments("bing")) %>%
+  group_by(year, president) %>% 
+  count(sentiment) %>%
+  spread(key = sentiment, value = n) %>% 
+  left_join(year_total) %>% 
+  mutate(sentiment = positive - negative,
+         avg_sentiment = sentiment / (positive + negative) * 100)
+
+sentiments_per_year %>%
+  ggplot(aes(x = as.numeric(year), y = sentiment, colour = president)) +
+  geom_point() + 
+  geom_smooth(method = "loess", aes(colour = sentiment))
+
+
+```
+**Insights:** 
+...
+
+
+
+## How can we be sure whether average sentiment is increasing over time?
+
+```{r}
+
+model <- lm(avg_sentiment ~ as.numeric(year), data = sentiments_per_year)
+summary(model)
+
+```
+**Insights:** 
+...
 
 
 
@@ -172,6 +526,8 @@ tidy_sona_words %>%
             avg_sentiment = sum(score) / nrow(tidy_sona_words) * 100)
 
 ```
+**Insights:** 
+...
 
 
 
@@ -192,17 +548,24 @@ tidy_sona_words %>%
          sentiment_norm = (positive - negative) / nrow(tidy_sona_words) * 100)
 
 ```
+**Insights:** 
+...
+
+
 
 ## STILL TO DO:
-## Aggregating sentiment over words
-## Dealing with Negation
-## Per President
-
-```{r}
+## Bigrams
+## Dealing with negation
 
 
 
+## References
 
-```
+https://www.kaggle.com/rtatman/tutorial-sentiment-analysis-in-r
+
+https://www.datacamp.com/community/tutorials/sentiment-analysis-R
+
+
+
 
 
