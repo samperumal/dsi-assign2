@@ -1,0 +1,187 @@
+---
+title: "Catdog Transfer learning example"
+author: "Merveaydin"
+date: "9/10/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+
+train_directory <- "~/Downloads/dogscats/train/"
+validation_directory <- "~/Downloads/dogscats/validation/"
+test_directory <- "~/Downloads/dogscats/test/"
+
+```
+```{r}
+train_samples <- length(list.files(paste(train_directory,"dog",sep=""))) +
+    length(list.files(paste(train_directory,"cat",sep="")))
+
+validation_samples <- length(list.files(paste(validation_directory,"dog",sep=""))) +
+    length(list.files(paste(validation_directory,"cat",sep="")))
+
+test_samples <- length(list.files(paste(test_directory,"dog",sep=""))) +
+    length(list.files(paste(test_directory,"cat",sep="")))
+```
+
+```{r}
+train_samples
+validation_samples
+test_samples
+```
+
+```{r}
+img_height <- 224
+img_width <- 224
+batch_size <- 16
+```
+
+```{r}
+train_generator <- flow_images_from_directory(
+  train_directory, 
+  generator = image_data_generator(),
+  target_size = c(img_height, img_width),
+  color_mode = "rgb",
+  class_mode = "binary", 
+  batch_size = batch_size, 
+  shuffle = TRUE,
+  seed = 123)
+
+validation_generator <- flow_images_from_directory(
+  validation_directory, 
+  generator = image_data_generator(), 
+  target_size = c(img_height, img_width), 
+  color_mode = "rgb", 
+  classes = NULL,
+  class_mode = "binary", 
+  batch_size = batch_size, 
+  shuffle = TRUE,
+  seed = 123)
+
+test_generator <- flow_images_from_directory(
+  test_directory, 
+  generator = image_data_generator(),
+  target_size = c(img_height, img_width), 
+  color_mode = "rgb", 
+  class_mode = "binary", 
+  batch_size = 1,
+  shuffle = FALSE)
+```
+
+```{r}
+base_model <- application_vgg16(weights = "imagenet", 
+                                       include_top = FALSE)
+```
+
+```{r}
+predictions <- layer_embedding(max_features, embedding_dims, input_length = max_length) %>%
+  # add some dropout
+  layer_dropout(0.3) %>%
+  # convolutional layer
+  layer_conv_1d(
+    filters = 250,
+    kernel_size = 3,
+    padding = "valid",  # "valid" means no padding, as we did it already
+    activation = "relu",
+    strides = 1
+  ) %>%
+  base_model$output %>% 
+  layer_global_average_pooling_2d(trainable=T) %>% 
+  layer_dense(units = 512, activation = "relu", trainable=T) %>% 
+  layer_dense(units = 1, activation = "sigmoid", trainable=T)
+
+model <- keras_model(inputs = base_model$input, 
+                     outputs = predictions)
+```
+
+```{r}
+summary(model)
+```
+
+```{r}
+for (layer in base_model$layers)
+  layer$trainable <- FALSE
+
+
+```
+
+```{r}
+summary(model)
+```
+
+```{r}
+model %>% compile(
+  loss = "binary_crossentropy",
+  optimizer = optimizer_sgd(lr = 0.0001, 
+                            momentum = 0.9, 
+                            decay = 1e-5),
+  metrics = "accuracy"
+)
+```
+
+```{r}
+model %>% fit_generator(
+  train_generator,
+  steps_per_epoch = as.integer(train_samples / batch_size), 
+  epochs = 3, 
+  validation_data = validation_generator,
+  validation_steps = as.integer(validation_samples / batch_size),
+  verbose = 1)
+```
+
+```{r}
+train_indices = sample(1:nrow(x_data), 0.9 * nrow(x_data), replace = FALSE)
+x_train = x_data[train_indices,]
+x_test = x_data[-train_indices,]
+y_train = y_data[train_indices,]
+y_test = y_data[-train_indices,]
+
+
+```
+
+```{r}
+base_model <- application_vgg16(weights = "imagenet",
+                                       include_top = FALSE)
+```
+
+```{r}
+for (layer in base_model$layers)
+  layer$trainable <- FALSE
+```
+
+```{r}
+predictions <- base_model$output %>% 
+  layer_global_average_pooling_2d() %>% 
+  layer_dense(units = 1024, activation = "relu") %>% 
+  layer_dense(units = 6, activation = "softmax")
+
+model <- keras_model(inputs = base_model$input, 
+                     outputs = predictions)
+```
+
+```{r}
+summary(model)
+```
+
+```{r}
+opt<-optimizer_adam(lr= 0.001)
+
+model %>% compile(
+  loss = "categorical_crossentropy",
+  optimizer = opt,
+  metrics = "accuracy"
+)
+```
+
+```{r}
+model %>% fit( x_train,y_train ,batch_size=32,
+               epochs=1,validation_data = list(x_test, y_test),
+               shuffle=TRUE)
+
+dim(cifar10$train$x[1:1000,,,]/255)
+dim(x_train)
+```
+
+```{r}
+model %>% evaluate(x_test, y_test, batch_size=32, verbose = 1)
+```
+
