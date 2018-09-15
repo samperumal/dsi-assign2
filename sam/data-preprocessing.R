@@ -17,7 +17,7 @@ extractData = function(filePath) {
 
     close(con)
 
-    lines = lines[str_length(lines) > 0]
+    lines = (lines[str_length(lines) > 0])
 
     matches = parseFilename(filename)
 
@@ -36,7 +36,7 @@ extractData = function(filePath) {
 
   return (list(
     presidents = presidents,
-    sentences = sentences,
+    sentences = sentences[-2:-1,],
     words = sentences %>% unnest_tokens(word, sentence, token = "words")
   ))
 }
