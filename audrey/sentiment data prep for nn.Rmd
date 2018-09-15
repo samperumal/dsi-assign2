@@ -98,10 +98,10 @@ bing_sentiment <- tidy_sona_words %>%
   mutate(sentiment = ifelse(is.na(sentiment), "not_in_bing_lexicon", sentiment)) %>% 
   spread(sentiment, n, fill = 0) %>%
   mutate(bing_sentiment = positive - negative,
-         total_words = positive + negative + not_in_lexicon,
+         total_words = positive + negative + not_in_bing_lexicon,
          bing_sentiment_perc = round((bing_sentiment/(total_words)*100),2)) %>% 
          # bing sentiment as a percentage of total words in the sentence
- select(-postive, -negative)
+ select(-positive, -negative)
 
 ```
 
@@ -140,7 +140,7 @@ nrc_sentiment <- tidy_sona_words %>%
 ```
 
 
-## **Sentiment Analysis using "nrc" lexicon (infers emotion with certain words)**
+## **Combining "bing", "afinn" and "nrc" sentiment**
 
 ```{r all}
 

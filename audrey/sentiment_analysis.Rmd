@@ -14,58 +14,26 @@ knitr::opts_chunk$set(
   library(tidytext),
   library(stringr),
   library(lubridate),
-  library(qdap),
-  library(knitr)
+  library(knitr),
+  library(qdap),            # polarity plots
+  library(widyr),           # pairwise correlation
+  library(ggrepel),         # geom_label_repel
+  library(gridExtra),       # grid.arrange for multi-graphs
+  library(kableExtra),      # tables
+  library(formattable),     # color_tile
+  library(yarrr),           # pirate plot
+  library(radarchart),      # radar chart
+  library(igraph),          # network diagrams
+  library(ggraph),          # network diagrams
+  library(wordcloud2)       # wordcloud
 )
-
-my_colors <- c("#E69F00", "#56B4E9", "#009E73", "#CC79A7", "#D55E00", "#D65E00")
-
-library(widyr)                  # For pairwise correlation
-
-# Visualizations
-library(ggrepel)                # geom_label_repel
-library(gridExtra)              # grid.arrange for multi-graphs
-library(kableExtra)             # tables
-library(formattable)            # color_tile
-library(circlize)               # chord diagram
-library(memery)                 # images with plots
-library(magick)                 # images with plots (image_read)
-library(yarrr)                  # pirate plot
-library(radarchart)             # radar chart
-library(igraph)                 # network diagrams
-library(ggraph)                 # network diagrams
-library(wordcloud2)             # wordcloud
-
-
-# Define some colors to use
-my_colors <- c("#E69F00", "#56B4E9", "#009E73", "#CC79A7", "#D55E00", "#D65E00")
-
-# Customize ggplot2's default theme settings
-theme_sentiment <- function(aticks = element_blank(),
-                         pgminor = element_blank(),
-                         lt = element_blank(),
-                         lp = "none")
-{
-  theme(plot.title = element_text(hjust = 0.5), # Center the title
-        axis.ticks = aticks,                    # Set axis ticks to on or off
-        panel.grid.minor = pgminor,             # Turn the minor grid lines on or off
-        legend.title = lt,                      # Turn the legend title on or off
-        legend.position = lp)                   # Turn the legend on or off
-}
-
-# Customize the text tables for consistency using HTML formatting
-my_kable_styling <- function(dat, caption) {
-  kable(dat, "html", escape = FALSE, caption = caption) %>%
-  kable_styling(bootstrap_options = c("striped", "condensed", "bordered"),
-                full_width = FALSE)
-}
 
 ```
 
 
-
-## Read in the Data
-
+  
+## **Read in the Data**  
+  
 ```{r import}
 
 txt_files <- list.files("../sona-text-1994-2018/")
@@ -94,10 +62,10 @@ sona$president <- unlist(str_extract_all(sona$filename, '(?<=_)[^_]+(?=.txt)'))
 
 ```
 
+  
 
-
-## Remove Stop Words and Tokenize by Sentences, Words and Bigrams
-
+## **Remove Stop Words and Tokenize by Sentences, Words and Bigrams**  
+  
 ```{r tokenize}
 
 # sentence tokenization
@@ -132,16 +100,16 @@ View(tidy_sona_words)
 View(tidy_sona_bigrams)
 
 ```
+  
 
-
-## Sentiment Analysis using "bing" lexicon
-
+### **Sentiment Analysis using "bing" lexicon**  
+  
 The "bing" lexicon encodes words as either "positive" or "negative". However, not all words used in the SONA speeches are in the lexicon so we need to adjust for this.
-
-### Sentiment per President
-
-Let's understand how many "positive" and "negative" words are used by each president across all their SONA speeches and create a metric called "sentiment" which is simply the total number of positive words minus the total number of negative words. We then adjust for the total number of words used from the lexicon in the "sentiment_score" metric. 
-
+  
+#### **Sentiment per President**   
+  
+Let's understand how many "positive" and "negative" words are used by each president across all their SONA speeches and create a metric called "sentiment" which is simply the total number of positive words minus the total number of negative words. We then adjust for the total number of words used from the lexicon in the "sentiment_score" metric.  
+  
 ```{r bing}
 
 # average sentiment per president
@@ -164,13 +132,15 @@ avg_sentiment %>%
                   full_width = FALSE)
 
 ```
-**Insights:** 
-Of the 3 presidents that have made more than 1 SONA speech, Zuma has the highest sentiment score, followed by Mbeki and then Mandela. Zuma's sentiment score is nearly double Mandela's. It's interesting that the current President has the second highest sentiment score, not far behind Zuma and only slightly ahead of Mbeki.
+   
+**Insights:**   
+  
+Of the 3 presidents that have made more than 1 SONA speech, Zuma has the highest sentiment score, followed by Mbeki and then Mandela. Zuma's sentiment score is nearly double Mandela's. It's interesting that the current President, Ramaphosa, has the second highest sentiment score, not far behind Zuma and only slightly ahead of Mbeki.
 
 
-
-### What are the 10 positive words most frequently used by each president?
-
+  
+#### **What are the 10 positive words most frequently used by each president?**
+  
 ```{r}
 
 positive_words <- tidy_sona_words %>%
@@ -199,13 +169,15 @@ positive_words %>%
     coord_flip()
 
 ```
-**Insights:** 
-De Klerk's most used words were "freedom", "peaceful" and "support" and at least 2 of these 3 come up in all the president's most used words. Mandela's most used words also include "progress", "improve", "reconciliation" and "commitment" which are all words indicating repair and a move towards something better. Mbeki uses many of the same words but also introduces "empowerment" which is a word carried through by Zuma and Ramaphosa and "success" which is carried through by Zuma. These words suggest progress in the move towards repair or something better, per Mandela. Ramaphosa also introduces the words "confidence", "effectively", "enhance" and "efficient", which are words commonly seen in a business context and have not shown up in any other SA president's top 10 most frequently used words in a SONA since 1994.
+  
+**Insights:**   
+  
+De Klerk's most used words were "freedom", "peaceful" and "support" and at least 2 of these 3 come up in all the president's most used words. Mandela's most used words also include "progress", "improve", "reconciliation" and "commitment" which are all words indicating repair and a move towards something better. Mbeki uses many of the same words but also introduces "empowerment" which is a word carried through by Zuma and Ramaphosa and "success" which is carried through by Zuma. These words suggest progress in the move towards repair or something better, first spoken about by Mandela. Ramaphosa also introduces the words "confidence", "effectively", "enhance" and "efficient", which are words commonly seen in a business context and have not shown up in any other SA president's top 10 most frequently used words in a SONA since 1994.  
 
 
-
-## Which of the positive words most frequently used are common across presidents?
-
+  
+#### **Which of the positive words most frequently used are common across presidents?**
+  
 ```{r}
 
 total_speeches <- tidy_sona_words %>% 
@@ -219,20 +191,23 @@ tidy_sona_words %>%
   count(word, sort = TRUE) %>%
   left_join(total_speeches) %>% 
   mutate(freq = n/total) %>% 
-  filter(rank(desc(freq)) <= 15) %>%
+  filter(rank(desc(freq)) <= 10) %>%
   ggplot(aes(reorder(word,freq), freq, fill = president)) + 
   geom_col() + 
   coord_flip() + 
-    xlab("") +
-  facet_grid(.~ president)
+  xlab("") +
+  facet_grid(.~ president) +
+  ggtitle("Positive Words most used across Presidents")
 
 ```
-**Insights:** 
-Common words across post 1994 presidents include: "freedom", "improve", "support" and "progress". Words introduced by Mandela and unique to his speeches are: "restructuring", "reconciliation" and "contribution". Mbeki introduces the word "integrated" into the top words used and this is unique to his speeches. Zuma uses the words "reform", "pleased", "led" and "sustainable" frequently and other presidents do not. Ramaphosa introduces the words "trust", "recovery", "outstanding", "liberation", "enhance", "efficient", "effective" and "decisive", which have not yet been seen in the any other SA president's top 10 most frequently used words in a SONA since 1994.
+  
+**Insights:**    
+  
+Common positive words across post 1994 presidents include: "freedom", "regard", "support", "improve" and "progress". Words introduced by Mandela and unique to his speeches are: "restructuring", "reconciliation", "committment", "contribution" and "succeed". Mbeki introduces the words "empowerment", "comprehensive", "integrated" and "improving" into the top words used and this is unique to his speeches. Zuma uses the words "success", "reform" and "pleased" frequently and other presidents do not. Ramaphosa introduces the words "significant", "productive", "confidence" and "effectively" which have not yet been seen in the any other SA president's top 10 most frequently used words in a SONA since 1994.  
 
 
 
-### What are the 10 negative words most used by each president?
+#### **What are the 10 negative words most used by each president?**  
 
 ```{r negative}
 
@@ -262,13 +237,21 @@ negative_words %>%
     coord_flip()
 
 ```
-**Insights:** 
-...
+  
+**Insights:**   
+  
+Common negative words pre 1994 include: "concerns"/"concern"/"concerned", "unconstitutional", "illusion", "hopeless", "disagree", "deprive", "conflict", and "boycott".
+
+Common negative words post 1994 include: "corruption", "crime"/"criminal", "poverty"/"poor", "inequality", "issue"/"issues" and "crisis".
+
+A negative word introduced by and unique to Mandela's top 10 is "struggle". 
+Mbeki is the only president with the word "racism" in his top 10 negative words.
+Motlanthe has "conflict" in his top 10 which no other president does. Zuma has "rail" which likely refers to the railway system and does have negative connotations for South Africa. Both Zuma and Ramaphosa use the word "difficult" a lot. Ramaphosa introduces the word "expropriation" into the top 10 for the first time amongst his peers.
 
 
 
-## How many of the negative words most used were used by each president?
-
+#### **How many of the negative words most used were used by each president?**  
+    
 ```{r}
 
 tidy_sona_words %>%
@@ -278,20 +261,23 @@ tidy_sona_words %>%
   count(word, sort = TRUE) %>%
   left_join(total_speeches) %>% 
   mutate(freq = n/total) %>% 
-  filter(rank(desc(freq)) <= 20) %>%
+  filter(rank(desc(freq)) <= 10) %>%
   ggplot(aes(reorder(word,freq), freq, fill = president)) + 
   geom_col() + 
   coord_flip() + 
-    xlab("") +
-  facet_grid(.~ president)
+  xlab("") +
+  facet_grid(.~ president) +
+  ggtitle("Negative Words most used across Presidents")
   
 ```
-**Insights:** 
-...
+  
+**Insights:**   
+  
+The interpretation is much the same as before. Note the clear separation between the top 10 negative words used pre and post 1994 elections, indicative of the pre and post apartheid regimes.
 
 
 
-## How does sentiment change over time?
+#### **What proportion of words used are positive vs negative?**
 
 ```{r trends}
 
@@ -299,30 +285,26 @@ sentiments_per_year <- tidy_sona_words %>%
   inner_join(get_sentiments("bing")) %>%
   group_by(year, sentiment) %>%
   summarize(n = n()) 
-sentiments_per_year
 
-sentiments_per_year <- sentiments_per_year %>% 
+sentiments_relative <- sentiments_per_year %>% 
   left_join(sentiments_per_year %>% 
             group_by(year) %>% 
             summarise(total = sum(n))) %>%
   mutate(freq = n/total) 
-head(sentiments_per_year)
-
-# plot number of positive and negative words used
-ggplot(filter(sentiments_per_year), aes(x = year, y = n, fill = sentiment)) +
-  geom_col() + coord_flip()
 
 # plot proportion of positive and negative words used
-ggplot(filter(sentiments_per_year), aes(x = year, y = freq, fill = sentiment)) +
-  geom_col() + coord_flip()
+ggplot(filter(sentiments_relative), aes(x = year, y = freq, fill = sentiment)) +
+  geom_col() + coord_flip() + ggtitle("% of Negative and Positive Words per Year")
 
 ```
-**Insights:** 
+  
+**Insights:**   
+  
 ...
 
 
 
-## Change in Sentiment over time
+### **Change in Sentiment over time**
 
 ```{r}
 
@@ -345,19 +327,43 @@ sentiments_per_year %>%
   geom_smooth(method = "loess", aes(colour = sentiment))
 
 ```
-**Insights:** 
+  
+**Insights:**    
+  
 ...
 
 
 
-## Change in Sentiment over time
+#### **Distribution of "bing" Sentiment per President**
 
 ```{r}
 
-year_total <- tidy_sona_words %>% 
-  group_by(year) %>% 
-  count() %>% 
-  rename(total = n)
+# per year, per president
+sentiments_per_year <- tidy_sona_words %>%
+  inner_join(get_sentiments("bing")) %>%
+  group_by(year, president) %>% 
+  count(sentiment) %>%
+  spread(key = sentiment, value = n) %>% 
+  left_join(year_total) %>% 
+  mutate(sentiment = positive - negative,
+         avg_sentiment = sentiment / (positive + negative) * 100)
+
+# plot of sentiment by president
+ggplot(sentiments_per_year, aes(x = president, y = avg_sentiment, colour = president)) + 
+  geom_boxplot() + # draw a boxplot for each president
+  ggtitle("Boxplots of bing Sentiment per President")
+
+```
+
+**Insights:**    
+  
+...
+
+
+
+#### **Change in "bing" Sentiment over time**
+
+```{r}
 
 # per year
 sentiments_per_year <- tidy_sona_words %>%
@@ -370,18 +376,20 @@ sentiments_per_year <- tidy_sona_words %>%
          avg_sentiment = sentiment / (positive + negative) * 100)
 
 sentiments_per_year %>%
-  ggplot(aes(x = as.numeric(year), y = sentiment, colour = president)) +
+  ggplot(aes(x = as.numeric(year), y = avg_sentiment, colour = president)) +
   geom_point() + 
-  geom_smooth(method = "loess", aes(colour = sentiment))
-
+  geom_smooth(method = "loess", aes(colour = sentiment)) +
+  ggtitle("Change in bing Sentiment over time")
 
 ```
-**Insights:** 
+  
+**Insights:**  
+  
 ...
 
 
 
-## How can we be sure whether average sentiment is increasing over time?
+### **How can we be sure whether average sentiment is increasing over time?**
 
 ```{r}
 
@@ -389,60 +397,156 @@ model <- lm(avg_sentiment ~ as.numeric(year), data = sentiments_per_year)
 summary(model)
 
 ```
-**Insights:** 
+  
+**Insights:**   
+  
 ...
 
 
 
-## **Sentiment Analysis using "afinn" lexicon (scale from -5 negative to +5 positive)**
+### **Sentiment Analysis using "afinn" lexicon (scale from -5 negative to +5 positive)**
 
 ```{r afinn}
 
 tidy_sona_words %>%
   inner_join(get_sentiments("afinn")) %>%
   count(score) %>% 
-  mutate(weighted_score = score * n)
-
-tidy_sona_words %>%
-  inner_join(get_sentiments("afinn")) %>%
-  summarise(sentiment = sum(score),
-            avg_sentiment = sum(score) / nrow(tidy_sona_words) * 100)
+  mutate(weighted_score = score * n) %>% 
+  ungroup(weighted_score) %>%
+  mutate(weighted_score = color_bar("lightblue")(weighted_score),
+         n = color_bar("lightblue")(n)) %>%
+  kable("html", escape = FALSE, align = "r", caption = "afinn Sentiment") %>%
+  kable_styling(bootstrap_options = 
+                  c("striped", "condensed", "bordered"), 
+                  full_width = FALSE)
 
 ```
-**Insights:** 
+  
+**Insights:**  
+  
 ...
 
 
-
-## **Sentiment Analysis using "nrc" lexicon (infers emotion with certain words)**
+#### **Distribution of "afinn" Sentiment per President**
 
 ```{r}
 
-tidy_sona_words %>%
-  inner_join(get_sentiments("nrc")) %>%
-  count(sentiment)
+# per year, per president
+sentiments_per_year <- tidy_sona_words %>%
+  inner_join(get_sentiments("afinn")) %>%
+  group_by(year, president) %>% 
+  count(score) %>%
+  mutate(score = ifelse(is.na(score), 0, score),
+         total_words = sum(n),
+         afinn_sentiment = sum(score * n),   # weighted score
+         afinn_sentiment_perc = round((afinn_sentiment/total_words*100),2)) %>% 
+         # afinn sentiment as a percentage of total words in the sentence
+  spread(key = score, value = n, fill = 0)
 
-tidy_sona_words %>%
-  inner_join(get_sentiments("nrc")) %>%
-  count(sentiment) %>%
-  filter(sentiment %in% c("positive", "negative")) %>%
-  spread(sentiment, n, fill = 0) %>%
-  mutate(sentiment = positive - negative,
-         sentiment_norm = (positive - negative) / nrow(tidy_sona_words) * 100)
+# plot of sentiment by president
+ggplot(sentiments_per_year, aes(x = president, y = afinn_sentiment_perc, colour = president)) +   geom_boxplot() + # draw a boxplot for each president
+  ggtitle("Boxplots of afinn sentiment per President")
 
 ```
-**Insights:** 
+
+**Insights:**    
+  
 ...
 
 
 
-## STILL TO DO:
-## Bigrams
-## Dealing with negation
+#### **Change in "afinn" Sentiment over time**
+
+```{r}
+
+sentiments_per_year %>%
+  ggplot(aes(x = as.numeric(year), y = afinn_sentiment, colour = president)) +
+  geom_point() + 
+  geom_smooth(method = "loess", aes(colour = afinn_sentiment_perc)) +
+  ggtitle("Change in afinn Sentiment over time")
+
+```
 
 
 
-## References
+### **Sentiment Analysis using "nrc" lexicon (infers emotion with certain words)**
+
+```{r}
+
+president_total <- tidy_sona_words %>% 
+  group_by(president) %>% 
+  count() %>% 
+  rename(total = n)
+
+# nrc sentiment per president
+nrc_sentiment <- tidy_sona_words %>%
+  inner_join(get_sentiments("nrc")) %>%
+  group_by(president, sentiment) %>% 
+  summarise(word_count = n()) %>%
+  left_join(president_total) %>% 
+  mutate(word_perc = round((word_count/total*100),2)) %>% 
+  ungroup() %>%
+  mutate(sentiment = reorder(sentiment, word_count)) %>%
+  ggplot(aes(sentiment, word_perc, fill = president)) +
+  facet_wrap(~president, 
+           ncol = 3, nrow = 3, 
+           scales = "free") +
+  geom_col() +
+  guides(fill = FALSE) +                       # turn off the legend
+  labs(x = NULL, y = "Relative Word Count") +
+  scale_y_continuous(limits = c(0, 20)) +      # hard code the axis limit
+  ggtitle("NRC Sentiment per President") +
+  coord_flip()
+
+```
+
+**Insights:**   
+...
+
+
+### **Sentiment Analysis using "nrc" lexicon**
+
+```{r}
+
+nrc_sentiment <- tidy_sona_words %>%
+  inner_join(get_sentiments("nrc")) %>%
+  group_by(sentiment) %>% 
+  count(word, sort = TRUE) %>%
+  arrange(desc(n)) %>%
+  slice(seq_len(8)) %>% #consider top_n() from dplyr also
+  ungroup() 
+
+nrc_sentiment %>% 
+  # set `y = 1` to just plot one variable and use word as the label
+  ggplot(aes(word, 1, label = word, fill = sentiment )) +
+  # we want the words, not the points
+  geom_point(color = "transparent") +
+  # make sure the labels don't overlap
+  geom_label_repel(force = 1,nudge_y = .5,  
+                   direction = "y",
+                   box.padding = 0.04,
+                   segment.color = "transparent",
+                   size = 3) +
+  facet_grid(~sentiment) +
+  theme(axis.text.y = element_blank(), axis.text.x = element_blank(),
+        axis.title.x = element_text(size = 6),legend.position="none",
+        panel.grid = element_blank(), panel.background = element_blank(),
+        panel.border = element_rect("lightgray", fill = NA),
+        strip.text.x = element_text(size = 9)) +
+  xlab(NULL) + ylab(NULL) +
+  ggtitle("NRC Sentiment") +
+  coord_flip()
+
+```
+
+
+### STILL TO DO:
+### Bigrams
+### Dealing with negation
+
+
+
+### References
 
 https://www.kaggle.com/rtatman/tutorial-sentiment-analysis-in-r
 

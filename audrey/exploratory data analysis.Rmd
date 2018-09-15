@@ -85,11 +85,6 @@ bigrams_filtered <- bigrams_separated %>%
 tidy_sona_bigrams <- bigrams_filtered %>%
   unite(bigram, word1, word2, sep = " ")
 
-# view data
-View(tidy_sona_sentences)
-View(tidy_sona_words)
-View(tidy_sona_bigrams)
-
 ```
 
 
