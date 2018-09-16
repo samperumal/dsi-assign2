@@ -1,11 +1,19 @@
 ---
-title: "Exploratory Data Analysis (EDA)"
-author: "Audrey Pentz"
+title: "DSI Assignment 2 Final Report"
+authors: "Merve Aydin Chester AYDMER001",
+         "Audrey Pentz, PNTAUD001",
+         "Sam Perumal PRMSAM001",
+         "Vanessa Saker, SKRVAN001"
 date: "September 20, 2018"
 output: html_document
 ---
 
+
 ```{r setup, include=FALSE}
+
+##---------------------------------##
+## ADD ANY LIBRARIES USED HERE
+##---------------------------------##
 
 knitr::opts_chunk$set(
   echo = TRUE,
@@ -14,28 +22,74 @@ knitr::opts_chunk$set(
   library(stringr),
   library(lubridate),
   library(knitr),
+  library(wordcloud),
   library(wordcloud2),    # wordcloud
   library(kableExtra),    # tables
   library(formattable)    # coloured cell in a table
 )
 
-```
-
-
-
-### **Read in the Data**
-
-```{r import}
+##---------------------------------##
+## DATA LOADED SO NO NEED TO RELOAD
+##---------------------------------##
 
 load("../input_data.RData")
+load("../sentence_data.RData")
 
 ```
 
 
+# **Description of the Problem**
 
-### **Remove Stop Words and Tokenize by Sentences, Words and Bigrams**
+We were given 30 State of the Nation (SONA) speeches from 1994 to 2018 to analyse. The specific objectives are to: 
+1. Infer sentiment and changes in sentiment over time  
+2. Describe the topics that emerge  
+3. Predict the President from a given sentence of text  
+4. Evaluate out of sample performance of the predictions  
 
-```{r tokenize}
+
+# **Approach**  
+
+We collaborated using the following GitHub location: https://github.com/samperumal/dsi-assign2. 
+
+We initially split the work as follows and each of us created a folder with our names to push our work to for others to view:  
+- Neural Net - Sam and Merve
+- Bag of Words - Merve
+- Topic Modelling - Vanessa
+- Sentiment Analysis - Audrey
+
+We presented our work to each other and made suggestions for improvement. The initial results from the Neural Net gave a 65% accuracy on the validation set and we wanted to feed the results of the Topic Modelling and Sentiment Analysis into the Neural Net to see if it would improve results so we needed to understand from each other what the output of these 2 methods was and the input required by the neural net to get the data into a useable format which took some discussion and a few iterations.
+
+Given the low accuracy of the neural net (NN), we also tried a Convolutional Neural Net (CNN). Sam got the initial model working. Merve made improvements. Vanessa tuned the hyperparamters.
+...need more here...
+
+The cnn did not provide much improvement over the NN so we also tried a Recurrent Neural Net (RNN) which takes in sequences of data so the order of the words is also taken into account in the model.
+...need more here...
+
+Initially we each performed our own import of the data, splitting out the year and president and tokenisation but we realised there was duplication of effort here and different naming conventions which made it difficult to collaborate and use each other's output. In addition, Sam noticed that some of the data was not being read in because of special characters and sentences were not being tokenised correctly for various reasons so he became responsible for performing the data clean up (preprocessing) and outputting a .RData file that we could all then use to rerun our work. This is explained in more detail below and at a high level includes:   
+- removing special characters such as slashes, currency symbols, currency values and numbers  
+- changing bullet points, colons, semi-colons and ellipsis to full stops  
+- changing the word after a full stop to sentence case  
+- removing multiple spaces and multiple full stops  
+
+Sam also assigned sentence id's using hashing and split the data into training and validation sets so that there would be consistency across what we were working on so that we could use each others work and compare results more easily.
+
+```{r preprocessing}
+
+# sam
+
+```
+
+Before diving into any analysis, we felt it is important to do an Exploratory Data Analysis (EDA) to get a sense of the high level overview of the dataset. This was done by Audrey.
+
+### **Overview of the dataset**  
+
+Each president has made a certain number of SONA speeches, depending on their term in office and whether there was 1 speech that year or 2 in the year of an election (pre and post election). Let's understand the number of words used by each President and how this varies across each SONA speech.  
+
+#### **Average number of words used per President**  
+
+We need to create a metric called "avg_words" which is simply the total number of words across all SONA speeches made by a particular president, divided by the total number of SONA speeches that president made.  
+
+```{r descPres}
 
 # sentence tokenization
 tidy_sona_sentences <- input_data$sentences
@@ -57,20 +111,6 @@ bigrams_filtered <- bigrams_separated %>%
 # join up the bigrams again
 tidy_sona_bigrams <- bigrams_filtered %>%
   unite(bigram, word1, word2, sep = " ")
-
-```
-
-
-
-### **Overview of the dataset**  
-
-Each president has made a certain number of SONA speeches, depending on their term in office and whether there was 1 speech that year or 2 in the year of an election (pre and post election). Let's understand the number of words used by each President and how this varies across each SONA speech.  
-
-#### **Average number of words used per President**  
-
-We need to create a metric called "avg_words" which is simply the total number of words across all SONA speeches made by a particular president, divided by the total number of SONA speeches that president made.  
-
-```{r descPres}
 
 # speeches
 speech_count <- tidy_sona_words %>%
@@ -226,6 +266,94 @@ density_per_year %>%
 ##### **Insights:**   
 
 De Klerk repeated over 30% of his words in his 1994 pre election SONA speech. On average, Mandela repeated about 25% of words in each of his SONA speeches and this reduced to about 20% in the post election speech of 1999. Mbeki's repitition rate was about 23% and this reduced to 20% in the post election speech of 2004. Zuma's repitition rate is over 30% with the exception of his post election speech of 2014 at about 23%.  
+
+
+
+# **Results**
+
+
+## **Sentiment Analysis**
+
+```{r sentiment}
+
+# audrey
+
+```
+
+
+
+## **Bag of Words using tf-idf**
+
+```{r tfidf}
+
+# merve
+
+```
+
+
+
+## **Topic Modelling**
+
+```{r topic}
+
+# vanessa
+
+```
+
+
+
+## **Neural Net (nn) to predict the President from a Sentence**
+
+
+```{r nn}
+
+# sam / merve??
+
+```
+
+
+
+### **Evaluate Out of Sample Performance**
+
+
+
+## **Convolutional Neural Net (cnn) to predict the President from a Sentence**
+
+```{r cnn}
+
+# ??
+
+```
+
+
+
+### **Evaluate Out of Sample Performance**
+
+
+#### **Recurrent Neural Net (rnn) to predict President from Sentence**
+
+
+```{r rnn}
+
+# sam
+
+```
+
+
+
+#### **Evaluate Out of Sample Performance**
+
+
+
+## **Analysis of Results and Conclusion**
+
+
+
+## **References**
+
+https://www.kaggle.com/rtatman/tutorial-sentiment-analysis-in-r
+
+https://www.datacamp.com/community/tutorials/sentiment-analysis-R
 
 
 
