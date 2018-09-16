@@ -103,13 +103,13 @@ extractData = function(filePath) {
 }
 
 if (!exists("input_data")) {
-  if (file.exists("inputData.RData"))
+  if (file.exists("input_data.RData"))
   {
-    load(file = "inputData.RData")
+    load(file = "input_data.RData")
   }
   else {
     input_data = extractData(filePath)
-    save(input_data, file = "inputData.RData")
+    save(input_data, file = "input_data.RData")
   }
 }
 
