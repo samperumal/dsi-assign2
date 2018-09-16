@@ -5,13 +5,12 @@ keras::use_python("D:/Dev/Anaconda3")
 keras::use_condaenv("D:/Dev/Anaconda3")
 reticulate::import_from_path("rpytools", path = "C:/Program Files/R/R-3.4.4/library/reticulate/python")
 
-if (!exists("inputData"))
-  source("sam/data-preprocessing.R", echo = FALSE)
+source("sam/data-preprocessing.R", echo = FALSE)
 
 # Calculate distinct number of words in corpus
-max_words = inputData$words %>% select(word) %>% unique() %>% count()
+max_words = input_data$words %>% select(word) %>% unique() %>% count()
 # Calculate maximum word count in any sentence
-max_length= inputData$words %>% group_by(id) %>% summarise(n = n())
+max_length= input_data$words %>% group_by(id) %>% summarise(n = n())
 min_length = 10
 max_length = 80
 

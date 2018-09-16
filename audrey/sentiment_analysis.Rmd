@@ -32,33 +32,11 @@ knitr::opts_chunk$set(
 
 
   
-## **Read in the Data**  
+## **Load the Preprocessed Data**  
   
 ```{r import}
 
-txt_files <- list.files("../sona-text-1994-2018/")
-
-sona <- data.frame(filename = as.character(), speech = as.character())
-for(i in txt_files){
-  file_name <- paste0("../sona-text-1994-2018/", i)
-  
-  # import text as single character string (can also read.table but the "seperator" causes problems)
-  this_speech <- readChar(file_name, 
-                          nchars = file.info(file_name)$size)
-  
-  # make data frame with metadata (filename contains year and pres) and speech
-  this_sona <- data.frame(filename = i, speech = this_speech, stringsAsFactors = FALSE)
-  
-  # make a single dataset
-  sona <- rbind(sona, this_sona)
-}
-
-# extract year
-sona$year <- str_sub(sona$filename, start = 1, end = 4)
-
-# extract president name
-sona$president <- unlist(str_extract_all(sona$filename, '(?<=_)[^_]+(?=.txt)'))
-# this finds everything between "_" and ".txt"
+load("../input_data.RData")
 
 ```
 
@@ -69,20 +47,15 @@ sona$president <- unlist(str_extract_all(sona$filename, '(?<=_)[^_]+(?=.txt)'))
 ```{r tokenize}
 
 # sentence tokenization
-tidy_sona_sentences <- sona %>% 
-  unnest_tokens(text, speech, token = "sentences")
-# add an ID variable for sentences
-tidy_sona_sentences <- tidy_sona_sentences %>%
-  mutate(sentence_id = row_number() )
+tidy_sona_sentences <- input_data$sentences
 
 # word tokenization
-tidy_sona_words <- tidy_sona_sentences %>% 
-  unnest_tokens(word, text, token = "words") %>% 
+tidy_sona_words <- input_data$words %>% 
   filter(!word %in% stop_words$word, str_detect(word, "[a-z]"))  # remove stop words
 
 # bigram tokenization
 bigrams <- tidy_sona_sentences %>% 
-  unnest_tokens(bigram, text, token = "ngrams", n = 2)
+  unnest_tokens(bigram, sentence, token = "ngrams", n = 2)
 # separate the bigrams 
 bigrams_separated <- bigrams %>%
   separate(bigram, c("word1", "word2"), sep = " ")
