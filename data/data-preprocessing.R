@@ -22,7 +22,7 @@ extractData = function(filePath) {
 
     if (apply_filter) {
       # Remove uneccessary non-word characters.
-      lines = str_replace_all(lines, "[\"“”%'’‘\\[\\]\\(\\)–+¬>-]", "")
+      lines = str_replace_all(lines, "[\"“”%’‘\\[\\]\\(\\)–+¬>-]", "")
       # Replace slashes with spaces
       lines = str_replace_all(lines, "[/]", " ")
 
@@ -48,7 +48,10 @@ extractData = function(filePath) {
     # Extract parts of filename
     matches = parseFilename(filename)
 
-    result = data.frame(speech = lines, year = as.integer(matches[2]), election = matches[3], president = matches[4],
+    result = data.frame(speech = lines,
+                        president = matches[4],
+                        year = as.integer(matches[2]),
+                        election = matches[3],
                         stringsAsFactors = FALSE)
 
     return(result)
@@ -88,16 +91,27 @@ extractData = function(filePath) {
   ))
 }
 
-inputData = extractData(filePath)
+if (!exists("inputData")) {
+  if (file.exists("inputData.RData"))
+  {
+    load(file = "inputData.RData")
+  }
+  else {
+    inputData = extractData(filePath)
+    save(inputData, file = "inputData.RData")
+  }
+}
 
-inputData$sentences %>%
-  mutate(slen = str_length(sentence)) %>%
-  filter(slen > 400) %>%
-  arrange(desc(slen)) %>%
-  #filter(!grepl("[^A-Za-z.,!?' -]", sentence)) %>%
-  #select(id, sentence) %>%
-  write.table(file = "long_sentences.txt")
+write_debug_data = function () {
+  inputData$sentences %>%
+    mutate(slen = str_length(sentence)) %>%
+    filter(slen > 400) %>%
+    arrange(desc(slen)) %>%
+    #filter(!grepl("[^A-Za-z.,!?' -]", sentence)) %>%
+    #select(id, sentence) %>%
+    write.table(file = "long_sentences.txt")
 
-write.table(inputData$filtered_lines, file = "filtered_lines.txt")
-write.table(inputData$sentences, file = "sentences.txt")
-write.table(inputData$sentences %>% filter(year == "2008"), file = "sentences_check.txt")
+  write.table(inputData$filtered_lines, file = "filtered_lines.txt")
+  write.table(inputData$sentences, file = "sentences.txt")
+  write.table(inputData$sentences %>% filter(year == "2008"), file = "sentences_check.txt")
+}
