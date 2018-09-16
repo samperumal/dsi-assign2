@@ -68,6 +68,17 @@ extractData = function(filePath) {
     # remove dated prefaces
     filter(!grepl("^(february|may|deputy speaker|mr lovemore moyo)", sentence))
 
+  # Find duplicate sentence ids
+  duplicate_ids = sentences %>%
+    group_by(id) %>%
+    summarise(n = n()) %>%
+    filter(n > 1) %>%
+    select(id) %>%
+    unique()
+
+  # Remove duplicate sentences
+  sentences = sentences %>% anti_join(duplicate_ids, by = "id")
+
   presidents = sentences %>% select(president) %>% distinct()
 
   words = sentences %>% unnest_tokens(word, sentence, token = "words")
@@ -91,19 +102,19 @@ extractData = function(filePath) {
   ))
 }
 
-if (!exists("inputData")) {
+if (!exists("input_data")) {
   if (file.exists("inputData.RData"))
   {
     load(file = "inputData.RData")
   }
   else {
-    inputData = extractData(filePath)
-    save(inputData, file = "inputData.RData")
+    input_data = extractData(filePath)
+    save(input_data, file = "inputData.RData")
   }
 }
 
 write_debug_data = function () {
-  inputData$sentences %>%
+  input_data$sentences %>%
     mutate(slen = str_length(sentence)) %>%
     filter(slen > 400) %>%
     arrange(desc(slen)) %>%
@@ -111,7 +122,7 @@ write_debug_data = function () {
     #select(id, sentence) %>%
     write.table(file = "long_sentences.txt")
 
-  write.table(inputData$filtered_lines, file = "filtered_lines.txt")
-  write.table(inputData$sentences, file = "sentences.txt")
-  write.table(inputData$sentences %>% filter(year == "2008"), file = "sentences_check.txt")
+  write.table(input_data$filtered_lines, file = "filtered_lines.txt")
+  write.table(input_data$sentences, file = "sentences.txt")
+  write.table(input_data$sentences %>% filter(year == "2008"), file = "sentences_check.txt")
 }
