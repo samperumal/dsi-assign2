@@ -33,6 +33,18 @@ sona$year <- str_sub(sona$filename, start = 1, end = 4)
 # extract president name
 sona$president <- unlist(str_extract_all(sona$filename, '(?<=_)[^_]+(?=.txt)'))
 # this finds everything between "_" and ".txt"
+
+# word tokenization
+sona %>% unnest_tokens(text, speech, token = "words")
+
+# we want to predict sentences, so we need to first split into sentences
+tidy_sona <- sona %>% unnest_tokens(text, speech, token = "sentences")
+
+
+
+#id varaibele for eah sentence
+tidy_sona = tibble::rowid_to_column(tidy_sona, "ID")
+colnames(tidy_sona)[1] <- "sentence_id"
 ```
 
 ### Topic Modelling
