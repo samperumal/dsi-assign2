@@ -74,7 +74,7 @@ model %>%
   layer_dropout(0.5) %>%
   layer_activation("relu") %>%
   layer_dense(president_count) %>%   # single unit output layer
-  layer_activation("sigmoid")
+  layer_activation("softmax")
 
 model %>% compile(
   loss = "categorical_crossentropy",
