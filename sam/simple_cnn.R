@@ -4,43 +4,51 @@ require(tidytext, quietly = TRUE)
 keras::use_python("D:/Dev/Anaconda3")
 keras::use_condaenv("D:/Dev/Anaconda3")
 reticulate::import_from_path("rpytools", path = "C:/Program Files/R/R-3.4.4/library/reticulate/python")
+tensorflow::tf$ConfigProto(intra_op_parallelism_threads=as.integer(3), inter_op_parallelism_threads=as.integer(3))
 
-source("sam/data-preprocessing.R", echo = FALSE)
+source("data/data-preprocessing.R", echo = FALSE)
+source("data/data-sampling.R", echo = FALSE)
 
 # Calculate distinct number of words in corpus
 max_words = input_data$words %>% select(word) %>% unique() %>% count()
+max_words = 0.9 * max_words # Only take specified percentage of words
+
 # Calculate maximum word count in any sentence
 max_length= input_data$words %>% group_by(id) %>% summarise(n = n())
-min_length = 10
+min_length = 7
 max_length = 80
 
-# Filter out short sentences
-sentence_data = inputData$sentences %>% filter(stringi::stri_length(sentence) > min_length)
-
 # Extract sentences and presidents
-sentences = sentence_data %>% select(sentence) %>% unlist()
-presidents = sentence_data %>% select(president) %>% unlist()
+sentences = input_data$sentences %>% select(sentence) %>% unlist()
+presidents = input_data$presidents %>% unlist()
 
-# Convert sentences to matrix of input vectors
+# Fit input tokenizer
 tokenizer = keras::text_tokenizer(num_words = max_words)
 tokenizer$fit_on_texts(sentences)
-sequences = tokenizer$texts_to_sequences(sentences)
-x_data = pad_sequences(sequences, max_length, padding = "post", truncating = "post")
 
-# One-hot encode president
+# Fit president tokenizer
 president_count = presidents %>% as_tibble() %>% unique() %>% count()
 response_tokenizer = text_tokenizer(num_words = president_count + 1)
 response_tokenizer$fit_on_texts(presidents)
-# Extract response vector, ignoring first (empty) column
-y_data = (response_tokenizer$texts_to_matrix(presidents, mode = "binary"))[,-1]
 
-# Create test and train sets
-train_indices = sample(1:nrow(x_data), 0.9 * nrow(x_data), replace = FALSE)
-x_train = x_data[train_indices,]
-x_valid = x_data[-train_indices,]
-y_train = y_data[train_indices,]
-y_valid = y_data[-train_indices,]
+tokenize_data = function(data_list) {
+  # Filter out short sentences
+  filtered_list = (data_list %>% filter(stringi::stri_length(sentence) > min_length))
 
+  # Convert sentences to matrix of input vectors
+  sequences = tokenizer$texts_to_sequences(filtered_list$sentence)
+  x_data = pad_sequences(sequences, max_length, padding = "pre", truncating = "pre")
+
+  # One-hot encode president
+  # Extract response vector, ignoring first (empty) column
+  y_data = (response_tokenizer$texts_to_matrix(filtered_list$president, mode = "binary"))[,-1]
+
+  return (list(x = x_data, y = y_data))
+}
+
+# Transform test and validation sets
+train = tokenize_data(sentence_data$train)
+validate = tokenize_data(sentence_data$validate)
 
 # Build model
 max_features <- max_words  # choose max_features most popular words
@@ -55,7 +63,7 @@ model %>%
   layer_dropout(0.5) %>%
   # convolutional layer
   layer_conv_1d(
-    filters = 250,
+    filters = 50,
     kernel_size = 3,
     padding = "valid",  # "valid" means no padding, as we did it already
     activation = "relu",
@@ -66,7 +74,7 @@ model %>%
   layer_dropout(0.5) %>%
   layer_activation("relu") %>%
   layer_dense(president_count) %>%   # single unit output layer
-  layer_activation("sigmoid")
+  layer_activation("softmax")
 
 model %>% compile(
   loss = "categorical_crossentropy",
@@ -76,8 +84,8 @@ model %>% compile(
 
 model %>%
   fit(
-    x_train, y_train,
-    batch_size = 8,
+    train$x, train$y,
+    batch_size = 32,
     epochs = 10,
-    validation_data = list(x_valid, y_valid)
+    validation_data = list(validate$x, validate$y)
   )
