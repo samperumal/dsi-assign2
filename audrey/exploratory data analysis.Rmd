@@ -23,7 +23,7 @@ knitr::opts_chunk$set(
 
 
 
-### **Read in the Data**
+### **Load the Preprocessed Data**
 
 ```{r import}
 
@@ -64,13 +64,82 @@ tidy_sona_bigrams <- bigrams_filtered %>%
 
 ### **Overview of the dataset**  
 
-Each president has made a certain number of SONA speeches, depending on their term in office and whether there was 1 speech that year or 2 in the year of an election (pre and post election). Let's understand the number of words used by each President and how this varies across each SONA speech.  
+Each president has made a certain number of SONA speeches, depending on their term in office and whether there was 1 speech that year or 2 in the year of an election (pre and post election). Let's understand the number of sentences and words used by each President and how this varies across each SONA speech.  
 
-#### **Average number of words used per President**  
+
+
+#### **Average number of Sentences used per President**  
 
 We need to create a metric called "avg_words" which is simply the total number of words across all SONA speeches made by a particular president, divided by the total number of SONA speeches that president made.  
 
-```{r descPres}
+```{r PresidentSentences}
+
+# speeches
+speech_count <- tidy_sona_words %>%
+  group_by(year, president) %>%
+  count() %>% 
+  group_by(president) %>% 
+  summarise(num_speeches = n())
+
+# avg words per president
+avg_sentence_count <- tidy_sona_sentences %>%
+  group_by(president) %>% 
+  summarise(num_sentences = n()) %>% 
+  left_join(speech_count) %>% 
+  mutate(avg_sentences = round((num_sentences/num_speeches),0)) %>% 
+  arrange(desc(avg_sentences))
+
+# plot avg words per president
+avg_sentence_count %>%
+  ungroup(avg_sentences, president) %>%
+  mutate(avg_sentences = color_bar("lightblue")(avg_sentences)) %>%
+  kable("html", escape = FALSE, align = "l", caption = "Average number of words used per President") %>%
+  kable_styling(bootstrap_options = 
+                  c("striped", "condensed", "bordered"), 
+                  full_width = FALSE)
+
+```
+
+##### **Insights:**   
+
+On average, Mandeka, Mbeki and Zuma, the 3 longest reigning presidents, used a similar number of sentences per SONA speech at between 300 and 313. De Klerk used the least number of sentences at 103 and Motlanthe the most at 346, nearly 3.5 times as many as De Klerk.
+
+
+
+#### **Average Number of Sentences used per SONA**  
+
+```{r SONAsentemces}
+
+# per SONA
+sentence_count <- tidy_sona_sentences %>%
+  group_by(president, year, election) %>%
+  summarise(num_sentences = n()) %>%
+  arrange(desc(num_sentences)) 
+
+# plot words per SONA
+sentence_count %>%
+  ggplot(aes(x = as.numeric(year), y = num_sentences, colour = president)) +
+  geom_point() + 
+  geom_smooth(method = "loess", aes(colour = president)) +
+  geom_vline(xintercept = 1994, color = "grey") +
+  geom_vline(xintercept = 1999, color = "grey") +
+  geom_vline(xintercept = 2004, color = "grey") +
+  geom_vline(xintercept = 2009, color = "grey") +
+  geom_vline(xintercept = 2014, color = "grey")
+
+```
+
+##### **Insights:**   
+
+On average, Mandela's number of sentences increases over time more so than Mbeki's and Zuma's.
+
+
+
+#### **Average number of Words used per President**  
+
+We need to create a metric called "avg_words" which is simply the total number of words across all SONA speeches made by a particular president, divided by the total number of SONA speeches that president made.  
+
+```{r PresidentWords}
 
 # speeches
 speech_count <- tidy_sona_words %>%
@@ -104,9 +173,9 @@ On average, Mbeki used the most words in his SONA speeches, followed by Motlanth
 
 
 
-#### **Number of words used per SONA**  
+#### **Number of Words used per SONA speech**  
 
-```{r descSONA}
+```{r SONAwords}
 
 # per SONA
 word_count <- tidy_sona_words %>%
@@ -118,7 +187,12 @@ word_count <- tidy_sona_words %>%
 word_count %>%
   ggplot(aes(x = as.numeric(year), y = num_words, colour = president)) +
   geom_point() + 
-  geom_smooth(method = "loess", aes(colour = president))
+  geom_smooth(method = "loess", aes(colour = president)) +
+  geom_vline(xintercept = 1994, color = "grey") +
+  geom_vline(xintercept = 1999, color = "grey") +
+  geom_vline(xintercept = 2004, color = "grey") +
+  geom_vline(xintercept = 2009, color = "grey") +
+  geom_vline(xintercept = 2014, color = "grey")
 
 ```
   
@@ -130,36 +204,39 @@ Of the 3 presidents that have made more than 1 SONA speech, Mbeki used more word
 
 ### **What are the common words used across all SONA speeches?**  
 
-```{r}
+```{r wordcloud}
 
 # word cloud for words
 word_count <- tidy_sona_words %>%
+  filter(!(word %in% c("government", "south", "africa", "african"))) %>%    # remove obvious words dominating word cloud
   count(word, sort = TRUE)
 
-wordcloud2(word_count[1:300, ], size = .6, color='random-dark')
+wordcloud2(word_count[1:300, ], size = .5, color='random-dark')
 
 ```
   
 ##### **Insights:**   
 
-....  
+If we remove the dominant words: "government", "south", "africa" and "african", the most common words across all SONA speeches shown in the WordCloud are "people", "development", "national", "country", "public", "ensure", "continue", "regard" and "economic". One can hover over the html version to get the counts.
+
 
 
 ### **What are the common bigrams used across all SONA speeches?**  
 
-```{r}
+```{r bigramcloud}
 
 # word cloud for bigrams
 bigram_count <- tidy_sona_bigrams %>%
+  filter(!(bigram %in% c("south africa", "south africans", "south african", "local government"))) %>%    # remove obvious words dominating word cloud
   count(bigram, sort = TRUE)
 
-wordcloud2(bigram_count[1:300, ], size = .8, color='random-dark')
+wordcloud2(bigram_count[1:300, ], size = .35, color='random-dark')
 
 ```
   
 ##### **Insights:**   
 
-....
+If we remove the dominant bigrams: "south africa", "south africans", "south african" and "local government", the most common bigrams across all SONA speeches shown in the WordCloud are "public service", "economic growth", "private sector", "united nations", "public sector", "job creation", "world cup", "nelson mandela", "economic empowerment", "black economic", "human rights", "development programme", "rural development" and "social grants".
 
 
 
@@ -184,15 +261,20 @@ diversity_per_year %>%
   geom_smooth(method = "loess", aes(colour = president)) +
   ggtitle("Lexical Diversity per President") +
   xlab("year") +
-  ylab("")
+  ylab("") +
+  geom_vline(xintercept = 1994, color = "grey") +
+  geom_vline(xintercept = 1999, color = "grey") +
+  geom_vline(xintercept = 2004, color = "grey") +
+  geom_vline(xintercept = 2009, color = "grey") +
+  geom_vline(xintercept = 2014, color = "grey")
 
 ```
   
 ##### **Insights:**   
 
-The number of unique words per SONA ranges from about 700 with de Klerk in 1994 to over 2500 with Mandela in his post election speech of 1999. Mbeki's post election speech of 2004 and Zuma's post election speech of 2014 also got close to the 2500 mark.  
+The number of unique words per SONA ranges from about 780 with de Klerk in 1994 to over 2500 with Mandela in his post election speech of 1999. Mbeki's post election speech of 2004 and Zuma's post election speech of 2014 got to about 2250.  
 
-It's interesting that whilst the trend in the number of unique words used was most often upwards with Mandela, Mbeki and Zuma both show a mostly upward trend in the lead up to the election year, followed by a mostly downward trend after nearing the 2500 unique words mark in their post election speech.  
+It's interesting that whilst the trend in the number of unique words used was most often upwards with Mandela, Mbeki and Zuma both show a mostly upward trend in the lead up to the election year, followed by a mostly downward trend after reaching the 2250 unique words mark in their post election speech.  
 
 If we exclude the post election speeches, the number of unique words used by Mbeki during his term from 2000 to 2008 averages just under 2000 whereas the number of unique words used by Zuma during his term from 2009 to 2017 averages just over 1500.  
 
@@ -219,7 +301,12 @@ density_per_year %>%
   geom_smooth(method = "loess", aes(colour = president)) +
   ggtitle("Lexical Density per President") +
   xlab("year") +
-  ylab("")
+  ylab("") +
+  geom_vline(xintercept = 1994, color = "grey") +
+  geom_vline(xintercept = 1999, color = "grey") +
+  geom_vline(xintercept = 2004, color = "grey") +
+  geom_vline(xintercept = 2009, color = "grey") +
+  geom_vline(xintercept = 2014, color = "grey")
 
 ```
   

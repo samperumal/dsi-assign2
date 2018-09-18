@@ -252,7 +252,7 @@ The interpretation is much the same as before. Note the clear separation between
 
 #### **What proportion of words used are positive vs negative?**
 
-```{r trends}
+```{r}
 
 sentiments_per_year <- tidy_sona_words %>%
   inner_join(get_sentiments("bing")) %>%
@@ -267,13 +267,15 @@ sentiments_relative <- sentiments_per_year %>%
 
 # plot proportion of positive and negative words used
 ggplot(filter(sentiments_relative), aes(x = year, y = freq, fill = sentiment)) +
-  geom_col() + coord_flip() + ggtitle("% of Negative and Positive Words per Year")
+  geom_col() + coord_flip() + ggtitle("% of Negative and Positive Words per Year") +
+  geom_hline(yintercept = 0.60) +
+  geom_hline(yintercept = 0.70)
 
 ```
   
 **Insights:**   
   
-...
+The 2 vertical black lines are drawn at 60% amd 70% positivity rates. In the majority of years, SONA speeches fall within this range of positivity however a there are a few more negative speeches in earlier years and a few more positive speeches in later years.
 
 
 
@@ -281,29 +283,75 @@ ggplot(filter(sentiments_relative), aes(x = year, y = freq, fill = sentiment)) +
 
 ```{r}
 
-year_total <- tidy_sona_words %>% 
-  group_by(year) %>% 
-  count() %>% 
-  rename(total = n)
-
-# per year
-sentiments_per_year <- tidy_sona_words %>%
-  inner_join(get_sentiments("bing")) %>%
-  group_by(year) %>% 
-  count(sentiment) %>%
-  left_join(year_total) %>% 
-  mutate(freq = n / total * 100)
-
-sentiments_per_year %>%
+sentiments_relative %>%
   ggplot(aes(x = as.numeric(year), y = freq, colour = sentiment)) +
-  geom_point() + 
-  geom_smooth(method = "loess", aes(colour = sentiment))
+  geom_point() + geom_line() +
+  geom_smooth(method = "loess", aes(colour = sentiment)) +
+  geom_vline(xintercept = 1994, color = "grey") +
+  geom_vline(xintercept = 1999, color = "grey") +
+  geom_vline(xintercept = 2004, color = "grey") +
+  geom_vline(xintercept = 2009, color = "grey") +
+  geom_vline(xintercept = 2014, color = "grey")
 
 ```
   
 **Insights:**    
   
-...
+The trend appears to be more positive and less negative over time but how can we be sure?
+
+We will test whether negative sentiment is increasing or decreasing, then we will test whether positive sentment is increasing or decreasing . We will use a Binomial model because the frequencies are between 0 and 1. Finally, we will test whether average sentiment is increasing or decreasing using a linear model.
+
+#### **Is negative sentiment increasing over time?**
+
+```{r modelneg}
+
+model_neg <- glm( freq ~ as.numeric(year), data = subset(sentiments_relative, sentiment == "negative"), family = "binomial")
+summary(model_neg)
+
+```
+
+**Insights:**   
+  
+The slope is negative but the beta of the year variable is not significant so we cannot conclude that negative sentiment is decreasing over time.
+
+
+
+#### **Is postive sentiment increasing over time?**
+
+```{r modelpos}
+
+model_pos <- glm( freq ~ as.numeric(year), data = subset(sentiments_relative, sentiment == "positive"), family = "binomial")
+summary(model_pos)
+
+```
+  
+  
+**Insights:**   
+  
+The slope is positive but the beta of the year variable is not significant so we cannot conclude that positive sentiment is increasing over time.
+
+
+
+#### **Is average sentiment increasing over time?**
+
+```{r modelavg}
+
+sentiments_per_year <- tidy_sona_words %>%
+  inner_join(get_sentiments("bing")) %>%
+  group_by(year, president) %>% 
+  count(sentiment) %>%
+  spread(key = sentiment, value = n) %>% 
+  mutate(sentiment = positive - negative,
+         avg_sentiment = sentiment / (positive + negative) * 100)
+
+model_avg <- glm( avg_sentiment ~ as.numeric(year), data = sentiments_per_year, family = "gaussian")
+summary(model_avg)
+
+```
+
+**Insights:**   
+  
+The slope is positive and the beta of the year variable is significant at 1% so we can conclude that average sentiment is increasing over time.  
 
 
 
@@ -317,7 +365,6 @@ sentiments_per_year <- tidy_sona_words %>%
   group_by(year, president) %>% 
   count(sentiment) %>%
   spread(key = sentiment, value = n) %>% 
-  left_join(year_total) %>% 
   mutate(sentiment = positive - negative,
          avg_sentiment = sentiment / (positive + negative) * 100)
 
@@ -330,7 +377,7 @@ ggplot(sentiments_per_year, aes(x = president, y = avg_sentiment, colour = presi
 
 **Insights:**    
   
-...
+Apart from the last 2 presidents, Ramaphosa and Zuma, the presidents are in time order. We can see that other than Motlanthe, the trend is an increasing average sentiment over time but at a decreasing rate. The interquartile range of Mbeki is smaller than Zuma's which is smaller than Mandela's.
 
 
 
@@ -344,36 +391,25 @@ sentiments_per_year <- tidy_sona_words %>%
   group_by(year, president) %>% 
   count(sentiment) %>%
   spread(key = sentiment, value = n) %>% 
-  left_join(year_total) %>% 
   mutate(sentiment = positive - negative,
          avg_sentiment = sentiment / (positive + negative) * 100)
 
 sentiments_per_year %>%
   ggplot(aes(x = as.numeric(year), y = avg_sentiment, colour = president)) +
   geom_point() + 
-  geom_smooth(method = "loess", aes(colour = sentiment)) +
-  ggtitle("Change in bing Sentiment over time")
+  geom_smooth(method = "loess", aes(colour = president)) +
+  ggtitle("Change in bing Sentiment over time") +
+  geom_vline(xintercept = 1994, color = "grey") +
+  geom_vline(xintercept = 1999, color = "grey") +
+  geom_vline(xintercept = 2004, color = "grey") +
+  geom_vline(xintercept = 2009, color = "grey") +
+  geom_vline(xintercept = 2014, color = "grey")
 
 ```
   
 **Insights:**  
   
-...
 
-
-
-### **How can we be sure whether average sentiment is increasing over time?**
-
-```{r}
-
-model <- lm(avg_sentiment ~ as.numeric(year), data = sentiments_per_year)
-summary(model)
-
-```
-  
-**Insights:**   
-  
-...
 
 
 
@@ -435,8 +471,13 @@ ggplot(sentiments_per_year, aes(x = president, y = afinn_sentiment_perc, colour 
 sentiments_per_year %>%
   ggplot(aes(x = as.numeric(year), y = afinn_sentiment, colour = president)) +
   geom_point() + 
-  geom_smooth(method = "loess", aes(colour = afinn_sentiment_perc)) +
-  ggtitle("Change in afinn Sentiment over time")
+  geom_smooth(method = "loess", aes(colour = president)) +
+  ggtitle("Change in afinn Sentiment over time") +
+  geom_vline(xintercept = 1994, color = "grey") +
+  geom_vline(xintercept = 1999, color = "grey") +
+  geom_vline(xintercept = 2004, color = "grey") +
+  geom_vline(xintercept = 2009, color = "grey") +
+  geom_vline(xintercept = 2014, color = "grey")
 
 ```
 
@@ -452,14 +493,14 @@ president_total <- tidy_sona_words %>%
   rename(total = n)
 
 # nrc sentiment per president
-nrc_sentiment <- tidy_sona_words %>%
+tidy_sona_words %>%
   inner_join(get_sentiments("nrc")) %>%
   group_by(president, sentiment) %>% 
   summarise(word_count = n()) %>%
   left_join(president_total) %>% 
   mutate(word_perc = round((word_count/total*100),2)) %>% 
   ungroup() %>%
-  mutate(sentiment = reorder(sentiment, word_count)) %>%
+  mutate(sentiment = reorder(sentiment, word_count)) %>% 
   ggplot(aes(sentiment, word_perc, fill = president)) +
   facet_wrap(~president, 
            ncol = 3, nrow = 3, 
