@@ -60,17 +60,16 @@ df = tibble::rowid_to_column(sona, "ID")
 ```
 Prepare the word counts data
 ```{r}
+df = inputData$sentences
 president_word_count = df %>%
-  group_by(presidents) %>%
-  unnest_tokens(word, text) %>%
-  count(ID, word, sort = TRUE) %>%
+  group_by(president) %>%
+  unnest_tokens(word, sentence) %>%
+  count(id, word, sort = TRUE) %>%
   ungroup()
   
-#Join to get the file name and presidents
-president_word_count = left_join(president_word_count, df)
 
 bag_of_words <- president_word_count %>% 
-  select(ID, prez = presidents,  word,n) %>% 
+  select(ID = id, prez = president,  word,n) %>% 
   spread(key = word, value = n, fill = 0)
 
 set.seed(321)
@@ -181,11 +180,11 @@ Adding additional layers is straightforward in Keras. In this secton we build a 
 #### Create the model with compiling
 
 ```{r}
-model <- keras_model_sequential() #Creating an empty sequential model
+model2 <- keras_model_sequential() #Creating an empty sequential model
 
 #Define a model by sequentially adding layers.
 
-model %>%
+model2 %>%
   layer_dense(units = 16, activation = 'relu', input_shape = ncol(x_train)) %>%
   layer_dense(units = 16, activation = 'relu', kernel_regularizer = regularizer_l1_l2(l1 = 0.01, l2 = 0.01), bias_initializer = initializer_glorot_normal()) %>%
   layer_dense(units = 6, activation = 'softmax') %>%
@@ -220,26 +219,29 @@ model2 %>% evaluate(x_test, y_test, batch_size=32, verbose = 1)
 #Create the data for tf-idf mm model
 
 tidy_sona = df %>%
-  unnest_tokens(word, text, token = "words") %>% 
-  select(ID, word, filename, year, presidents) 
+  unnest_tokens(word, sentence, token = "words") %>% 
+  select(id, word, year, president) 
 
 sona_tdf <- tidy_sona %>%
-  group_by(ID,word) %>%
+  select(id,word) %>%
+  group_by(id,word) %>%
   count() %>%  
-  group_by(ID) %>%
+  group_by(id) %>%
   mutate(total = sum(n)) %>%
   ungroup()
 
 sona_tf_idf <- sona_tdf %>% 
-  bind_tf_idf(word, ID, n) # replace with values from tidytext
+  bind_tf_idf(word, id, n) # replace with values from tidytext
 
-sona_tf_idf = sona_tf_idf %>% left_join(df)
+#Get presidents names where id's match
+nm <- c("id", "president")
+sona_tf_idf[nm] <- lapply(nm, function(x) df[[x]][match(sona_tf_idf$id, df$id)])
+
 
 # Spreading the data
-bag_of_words <- sona_tf_idf %>% 
-  select(ID, prez = presidents, word, tf_idf) %>%  # note the change, using tf-idf
-  spread(key = word, value = tf_idf, fill = 0) %>%  
-  left_join(df %>% select(ID, prez = presidents))
+bag_of_words[1,] <- sona_tf_idf %>% 
+  select(ID = id, prez = president, word, tf_idf) %>%  # note the change, using tf-idf
+  spread(key = word, value = tf_idf, fill = 0)
 
 set.seed(321)
 training_ids <- bag_of_words %>% 

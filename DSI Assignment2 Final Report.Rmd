@@ -25,16 +25,17 @@ knitr::opts_chunk$set(
   library(wordcloud),
   library(wordcloud2),    # wordcloud
   library(kableExtra),    # tables
-  library(formattable)    # coloured cell in a table
+  library(formattable),    # coloured cell in a table
+  library(keras)
+  
 )
 
 ##---------------------------------##
 ## DATA LOADED SO NO NEED TO RELOAD
 ##---------------------------------##
 
-load("../input_data.RData")
-load("../sentence_data.RData")
-
+load("~/Downloads/dsi-assign2/input_data.RData")
+load("~/Downloads/dsi-assign2/sentence_data.RData")
 ```
 
 
@@ -286,7 +287,90 @@ De Klerk repeated over 30% of his words in his 1994 pre election SONA speech. On
 
 ```{r tfidf}
 
-# merve
+tidy_sona = df = input_data$sentences %>%
+  unnest_tokens(word, sentence, token = "words") %>% 
+  select(id, word, year, president) 
+
+sona_tdf <- tidy_sona %>%
+  select(id,word) %>%
+  group_by(id,word) %>%
+  count() %>%  
+  group_by(id) %>%
+  mutate(total = sum(n)) %>%
+  ungroup()
+
+sona_tf_idf <- sona_tdf %>% 
+  bind_tf_idf(word, id, n) # replace with values from tidytext
+
+#Get presidents names where id's match
+nm <- c("id", "president")
+sona_tf_idf[nm] <- lapply(nm, function(x) df[[x]][match(sona_tf_idf$id, df$id)])
+
+
+# Spreading the data
+tf_idf_wide <- sona_tf_idf %>% 
+  select(ID = id, prez = president, word, tf_idf) %>%  # note the change, using tf-idf
+  spread(key = word, value = tf_idf, fill = 0)
+
+#Create training anf testing set
+set.seed(321)
+training_ids <- tf_idf_wide %>% 
+  group_by(prez) %>% 
+  sample_frac(0.9) %>% 
+  ungroup() %>%
+  select(ID)
+
+training_sona <- tf_idf_wide %>% 
+  right_join(training_ids, by = "ID") %>%
+  select(-ID)
+
+test_sona <- tf_idf_wide %>% 
+  anti_join(training_ids, by = "ID") %>%
+  select(-ID)
+
+# Seperate response variable
+dim(training_sona) #6626 rows 10626 cols
+x_train <- normalize(as.matrix(training_sona %>% select(-prez))) 
+x_test <- normalize(as.matrix(test_sona %>% select(-prez)))
+
+#One-hot encoding for response variable
+labels_test = test_sona %>% select(prez) %>% unlist()
+president_count = labels_test %>% as_tibble() %>% unique() %>% count()
+response_tokenizer = text_tokenizer(num_words = president_count + 1)
+response_tokenizer$fit_on_texts(labels_test)
+# Extract response vector, ignoring first (empty) column
+y_test = (response_tokenizer$texts_to_matrix(labels_test, mode = "binary"))[,-1]
+
+labels_train = training_sona %>% select(prez) %>% unlist()
+president_count = labels_train %>% as_tibble() %>% unique() %>% count()
+response_tokenizer = text_tokenizer(num_words = president_count + 1)
+response_tokenizer$fit_on_texts(labels_train)
+# Extract response vector, ignoring first (empty) column
+y_train = (response_tokenizer$texts_to_matrix(labels_train, mode = "binary"))[,-1]
+
+#Define the model
+
+model <- keras_model_sequential() #Creating an empty sequential model
+
+#Define a model by sequentially adding layers.
+
+model %>%
+  layer_dense(units = 16, activation = 'relu', input_shape = ncol(x_train)) %>%
+  layer_dense(units = 16, activation = 'relu', kernel_regularizer = regularizer_l1_l2(l1 = 0.01, l2 = 0.01)) %>%
+  layer_dense(units = 6, activation = 'softmax') %>%
+  compile(
+  optimizer = 'rmsprop',
+  loss = 'categorical_crossentropy',
+  metrics = c('accuracy')
+)
+
+model %>% fit(x_train, y_train, epochs = 10, batch_size = 32, validation_data = list(x_test, y_test)
+) %>% plot()
+
+model %>% evaluate(x_test, y_test, batch_size=32, verbose = 1) #0.6183395 accuracy rate
+
+#preds <- model %>% predict_classes(x_test)              # get predicted classes for test data
+                    
 
 ```
 
