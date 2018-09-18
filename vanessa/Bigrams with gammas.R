@@ -5,49 +5,15 @@ library(dplyr)
 library(tidytext)
 library(topicmodels)
 
-#read data in
-txt_files <- list.files("sona-text-1994-2018/")
 
-#need to delete that .M file for this to work.
-#loop to read in file
-sona <- data.frame(filename = as.character(), speech = as.character())
-for(i in txt_files){
-  file_name <- paste0("sona-text-1994-2018/", i)
-  
-  # import text as single character string (can also read.table but the "seperator" causes problems)
-  this_speech <- readChar(file_name, 
-                          nchars = file.info(file_name)$size)
-  
-  # make data frame with metadata (filename contains year and pres) and speech
-  this_sona <- data.frame(filename = i, speech = this_speech, stringsAsFactors = FALSE)
-  
-  # make a single dataset
-  sona <- rbind(sona, this_sona)
-}
+load("input_data.RData")
 
+inputdata <- input_data$sentences
 
-#get year out
-str_sub(sona$filename, start = 1, end = 4)
-sona$year <- str_sub(sona$filename, start = 1, end = 4)
-
-
-#get ptesident name out
-sona$president <- unlist(str_extract_all(sona$filename, "[A-Z]+[a-z]+"))
-
-# word tokenization
-sona %>% unnest_tokens(text, speech, token = "words")
-
-# we want to predict sentences, so we need to first split into sentences
-tidy_sona <- sona %>% unnest_tokens(text, speech, token = "sentences")
-
-
-
-#id varaibele for eah sentence
-tidy_sona = tibble::rowid_to_column(tidy_sona, "ID")
-colnames(tidy_sona)[1] <- "sentence_id"
 
 #Getting Bigrams out
-tidy_sona3 = tidy_sona %>%  unnest_tokens(bigram, text, token = "ngrams", n  = 2)
+tidy_sona3 = input_data$sentences %>%  unnest_tokens(bigram, sentence, token = "ngrams", n  = 2)
+#class(tidy_sona3$id)
 
 #Get stop words
 data("stop_words")
@@ -67,34 +33,24 @@ bigrams_united <- bigrams_filtered %>%
 
 #get counts of bigrams
 bigrams_count <- bigrams_united %>%
-  group_by(bigram,sentence_id ) %>%
+  group_by(bigram, id ) %>%
   summarise(count_bigram = n()) %>%
-  select(sentence_id, bigram, count_bigram)
-
-
-#lets see if it works with the tfidf
-#it doesn't, btw. So this is jut hre for fun
-bigrams_tfidf <- bigrams_count %>%
-  bind_tf_idf(bigram, sentence_id, count_bigram) %>%
-  arrange( desc(tf_idf))
-
-##distribution of tdif
-plot(bigrams_tfidf$tf_idf)
+  select(id, bigram, count_bigram)
 
   
-
+#View(bigrams_count)
 
 ##Lets try and optimise
 ## I thought it might help to filter out but it actual makes things more complicated later on.
-dtm_grams <- bigrams_tfidf %>% 
+dtm_grams <- bigrams_count %>% 
 #  filter(tf_idf >= 2) %>%
-cast_dtm(sentence_id, bigram, count_bigram)
+cast_dtm(id, bigram, count_bigram)
 
 #loop for optimisations
 print(Sys.time())
 result <- FindTopicsNumber(
   dtm_grams,
-  topics = seq(from = 2, to = 30, by = 1),
+  topics = seq(from = 2, to = 15, by = 1),
   metrics = c("Griffiths2004", "CaoJuan2009", "Arun2010", "Deveaud2014"),
   method = "Gibbs",
   control = list(seed = 77),
@@ -209,14 +165,41 @@ beta_spread %>%
 #gamma matrix gives an idication of the probability that each sentence belongs to one of the topics.
 #the @documents is the sentence_ID
 
-speech_documents <- cbind(as.numeric(reviews_lda@documents), tidy(reviews_lda@gamma))
-colnames(speech_documents) <- c("sentence_id","X1","X2","X3","X4","X5","X6","X7","X8","X9","X10")
-#dim(speech_documents)
-#View(head(speech_documents))
+View(head(speech_documents))
+
+speech_documents <- cbind(as.character(reviews_lda@documents), tidy(reviews_lda@gamma), stringsAsFactors = FALSE)
+colnames(speech_documents) <- c("id","X1","X2","X3","X4","X5","X6","X7","X8","X9","X10")
+speech_documents$X1 <- as.double(speech_documents$X1)
+speech_documents$X1 <- as.double(speech_documents$X2)
+speech_documents$X1 <- as.double(speech_documents$X3)
+speech_documents$X1 <- as.double(speech_documents$X4)
+speech_documents$X1 <- as.double(speech_documents$X5)
+speech_documents$X1 <- as.double(speech_documents$X6)
+speech_documents$X1 <- as.double(speech_documents$X7)
+speech_documents$X1 <- as.double(speech_documents$X8)
+speech_documents$X1 <- as.double(speech_documents$X9)
+speech_documents$X1 <- as.double(speech_documents$X10)
+
 
 
 #Just a quick test. The Topc 6 looks like itnroductons so it is working.
-topic_matrix <- left_join(tidy_sona,  speech_documents, by = "sentence_id")
+topic_matrix <- left_join(inputdata,  speech_documents, by = "id")
+
+topic_matrix <- topic_matrix %>%
+  mutate(X1 = ifelse(is.na(X1), 0, X1)) %>%
+  mutate(X2 = ifelse(is.na(X1), 0, X2)) %>%
+  mutate(X3 = ifelse(is.na(X1), 0, X3)) %>%
+  mutate(X4 = ifelse(is.na(X1), 0, X4)) %>%
+  mutate(X5 = ifelse(is.na(X1), 0, X5)) %>%
+  mutate(X6 = ifelse(is.na(X1), 0, X6)) %>%
+  mutate(X7 = ifelse(is.na(X1), 0, X7)) %>%
+  mutate(X8 = ifelse(is.na(X1), 0, X8)) %>%
+  mutate(X9 = ifelse(is.na(X1), 0, X9)) %>%
+  mutate(X10 = ifelse(is.na(X1), 0, X10)) 
+  
+
+  
+dim(topic_matrix)
 #View(head(topic_matrix))
 #save this for Merve
 save(topic_matrix, file = "vanessa/topic_matrix.RData")
@@ -230,13 +213,6 @@ save(topic_matrix, file = "vanessa/topic_matrix.RData")
 
 ##########Geeting to the graphs
 
-
-##gather
-topic_matrix_long <- topic_matrix %>%
-  select(sentence_id, president, text, X1,X2,X3,X4,X5,X6,X7,X8,X9,X10) %>%
-  gather(X1, X2,X3,X4,X5,X6,X7,X8,X9,X10, key = "topic", value = "gamma")
-
-
 #View(head(topic_matrix))
 
 
@@ -248,10 +224,10 @@ data.max <- unlist(as.numeric(as.character(data.max)))
 
 topic_matrix <- cbind(topic_matrix, data.max)
 
-
+View(head(topic_matrix))
 ##gather data
 topic_matrix_long <- topic_matrix %>%
-  select(sentence_id, president, text, X1,X2,X3,X4,X5,X6,X7,X8,X9,X10, data.max) %>%
+  select(id, president, sentence, X1,X2,X3,X4,X5,X6,X7,X8,X9,X10, data.max) %>%
   gather(X1, X2,X3,X4,X5,X6,X7,X8,X9,X10, key = "topic", value = "gamma")
 
 #pivot
@@ -271,3 +247,20 @@ data.graph <- topic_matrix_long %>%
                      limits=c("1","2","3","4","5","6","7","8","9","10")) +
     facet_wrap(~ president, scales = "free") 
   
+  
+  ##########
+  data.graph <- topic_matrix_long %>%
+    group_by(president, data.max) %>%
+    summarise(count_topic = n())
+  #grapgh
+  ##Graph shows that sentences relating to topic 2 and 6 do not featrue in Klerk speeched
+  ## Mandela mostly talks about topic 8
+  ##Mbeki coveres the range of topics
+  #Zuma barly talks about 2
+  data.graph %>%
+    mutate(term = reorder(president, count_topic * data.max)) %>%
+    ggplot(aes(y= count_topic, x= data.max,  fill = factor(data.max))) +
+    geom_col(show.legend = FALSE) +
+    scale_x_discrete(name ="Topics", 
+                     limits=c("1","2","3","4","5","6","7","8","9","10")) +
+    facet_wrap(~ president, scales = "free") 
