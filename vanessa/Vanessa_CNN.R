@@ -72,7 +72,7 @@ val_y <- validate$y
 
 
 ############################
-FEATURES OF NN
+#FEATURES OF NN
 ##########################
 #Sam - this is also where I get confused
 
@@ -151,6 +151,9 @@ model_attempt
 ########Look at export
 ##This is just me trying to see if its actucally predicting
 
+predictions <- model_attempt %>% predict(val_x)
+
+
 #Getting the max of each rows prediction and binding it on the end
 pres.max <- as.data.frame(predictions)
 pres.max <- apply(predictions,1,which.max) 
@@ -165,3 +168,4 @@ pres.actual <- apply(val_y,1,which.max)
 predictions_val <- cbind(pres.max,pres.actual)
 head(predictions_val)
 ##I can't connect back to sentecne as the tokeniser drops 4 lines?
+
