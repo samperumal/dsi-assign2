@@ -1,9 +1,9 @@
 library(keras)
 
 #Settings for gloves embedding
-GLOVE_DIR <- '/glove.6B'
+GLOVE_DIR <- 'glove.6B'
 MAX_SEQUENCE_LENGTH <- 1000
-MAX_NUM_WORDS <- 20000
+MAX_NUM_WORDS <- 40000
 EMBEDDING_DIM <- 100
 VALIDATION_SPLIT <- 0.2
 
@@ -49,38 +49,32 @@ tokenizer %>% fit_text_tokenizer(input_data$sentences$sentence)
 # https://keras.rstudio.com/reference/save_text_tokenizer.html
 save_text_tokenizer(tokenizer, "tokenizer")
 
-sequences <- texts_to_sequences(tokenizer, input_data$sentences$sentence)
+# sequences <- texts_to_sequences(tokenizer, input_data$sentences$sentence)
+sequences_train = texts_to_sequences(tokenizer, balanced_train_data$sentence)
+sequences_valid = texts_to_sequences(tokenizer, sentence_data$validate$sentence)
 
 word_index <- tokenizer$word_index
 cat(sprintf('Found %s unique tokens.\n', length(word_index)))
 
-data <- pad_sequences(sequences, maxlen=MAX_SEQUENCE_LENGTH)
+x_train <- pad_sequences(sequences_train, maxlen=MAX_SEQUENCE_LENGTH)
+x_val <- pad_sequences(sequences_valid, maxlen=MAX_SEQUENCE_LENGTH)
 
 # Fit president tokenizer
-president_count = input_data$sentences$president %>% as_tibble() %>% unique() %>% count()
+president_count = balanced_train_data$president %>% as_tibble() %>% unique() %>% count()
 response_tokenizer = text_tokenizer(num_words = president_count + 1)
-response_tokenizer$fit_on_texts(input_data$sentences$president)
+response_tokenizer$fit_on_texts(balanced_train_data$president)
+response_tokenizer$fit_on_texts(sentence_data$validate$president )
+
 # One-hot encode president
 # Extract response vector, ignoring first (empty) column
-y_data = (response_tokenizer$texts_to_matrix(input_data$sentences$president, mode = "binary"))[,-1]
-labels <- y_data
+y_train = (response_tokenizer$texts_to_matrix(balanced_train_data$president, mode = "binary"))[,-1]
+y_val = (response_tokenizer$texts_to_matrix(sentence_data$validate$president , mode = "binary"))[,-1]
 
-cat('Shape of data tensor: ', dim(data), '\n')
-cat('Shape of label tensor: ', dim(labels), '\n')
+cat('Shape of data tensor: ', dim(data_train), '\n')
+cat('Shape of data tensor: ', dim(data_valid), '\n')
+cat('Shape of label tensor: ', dim(y_train), '\n')
+cat('Shape of data tensor: ', dim(y_test), '\n')
 
-# split the data into a training set and a validation set
-indices <- 1:nrow(data)
-indices <- sample(indices)
-data <- data[indices,]
-labels <- labels[indices,]
-num_validation_samples <- as.integer(VALIDATION_SPLIT * nrow(data))
-
-x_train <- data[-(1:num_validation_samples),]
-y_train <- labels[-(1:num_validation_samples),]
-x_val <- data[1:num_validation_samples,]
-y_val <- labels[1:num_validation_samples,]
-
-cat('Preparing embedding matrix.\n')
 
 # prepare embedding matrix
 num_words <- min(MAX_NUM_WORDS, length(word_index) + 1)
@@ -118,14 +112,16 @@ sequence_input <- layer_input(shape = list(MAX_SEQUENCE_LENGTH), dtype='int32')
 
 preds <- sequence_input %>%
   embedding_layer %>% 
-  layer_conv_1d(filters = 128, kernel_size = 5, activation = 'relu') %>% 
+  layer_conv_1d(filters = 64, kernel_size = 5, activation = 'relu',
+                use_bias = TRUE, kernel_initializer = "glorot_uniform") %>% 
+  layer_dropout(0.2) %>%
   layer_max_pooling_1d(pool_size = 5) %>% 
-  layer_conv_1d(filters = 128, kernel_size = 5, activation = 'relu') %>% 
+  layer_conv_1d(filters = 64, kernel_size = 5, activation = 'relu') %>% 
   layer_max_pooling_1d(pool_size = 5) %>% 
-  layer_conv_1d(filters = 128, kernel_size = 5, activation = 'relu') %>% 
+  layer_conv_1d(filters = 64, kernel_size = 5, activation = 'relu') %>% 
   layer_max_pooling_1d(pool_size = 35) %>% 
   layer_flatten() %>% 
-  layer_dense(units = 128, activation = 'relu') %>% 
+  layer_dense(units = 64, activation = 'relu') %>% 
   layer_dense(units = president_count, activation = 'softmax')
 
 
@@ -133,13 +129,40 @@ model <- keras_model(sequence_input, preds)
 
 model %>% compile(
   loss = 'categorical_crossentropy',
-  optimizer = 'rmsprop',
+  optimizer = optimizer_rmsprop(lr=0.002),
   metrics = c('acc')  
 )
 
 model %>% fit(
   x_train, y_train,
   batch_size = 128,
-  epochs = 10,
+  epochs = 15,
   validation_data = list(x_val, y_val)
 ) %>% plot()
+
+#Since the validation loss is still decreasing and the accuracy was increasing we will run 5 more epochs
+model %>% 
+  fit(x_train, y_train, epochs = 5, batch_size = 128,validation_data = list(x_val, y_val)) %>% 
+  plot()
+
+
+predictions <- model %>% predict(x_val)
+range(predictions)
+
+
+#Getting the max of each rows prediction and binding it on the end
+pres.max <- as.data.frame(predictions)
+pres.max <- apply(predictions,1,which.max) 
+pres.max <- unlist(as.numeric(as.character(pres.max)))
+pres.max <- cbind(predictions,pres.max )
+
+pres.actual <- as.data.frame(y_val)
+pres.actual <- apply(y_val,1,which.max) 
+
+
+predictions_val <- cbind(sentence_data$validate,pres.max,pres.actual)
+View(head(predictions_val, n= 100))
+predictions_val %>% filter(president == "Mbeki")
+
+t = table(predictions_val$pres.max, predictions_val$pres.actual)
+

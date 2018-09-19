@@ -167,10 +167,10 @@ model %>% fit(
   validation_data = list(x_val, y_val)
 ) %>% plot()
 
-#Since the validation loss is still decreasing and the accuracy was increasing we will run 5 more epochs
-model %>% 
-  fit(x_train, y_train, epochs = 5, batch_size = 128,validation_data = list(x_val, y_val)) %>% 
-  plot()
+#If the validation loss was still decreasing and the accuracy was increasing we could run 5 more epochs
+# model %>% 
+#   fit(x_train, y_train, epochs = 5, batch_size = 128,validation_data = list(x_val, y_val)) %>% 
+#   plot()
 
 
 predictions <- model %>% predict(x_val)
