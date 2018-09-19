@@ -78,7 +78,8 @@ bing_sentiment <- tidy_sona_words %>%
          total_words = positive + negative + not_in_bing_lexicon,
          bing_sentiment_perc = round((bing_sentiment/(total_words)*100),2)) %>% 
          # bing sentiment as a percentage of total words in the sentence
-  rename(bing_negative = negative, bing_positive = positive)
+  rename(bing_negative = negative, bing_positive = positive) %>%
+  ungroup()
 
 ```
 
@@ -97,7 +98,8 @@ afinn_sentiment <- tidy_sona_words %>%
          afinn_sentiment = sum(score * n),   # weighted score
          afinn_sentiment_perc = round((afinn_sentiment/total_words*100),2)) %>% 
          # afinn sentiment as a percentage of total words in the sentence
-  spread(key = score, value = n, fill = 0)
+  spread(key = score, value = n, fill = 0) %>%
+  ungroup()
 
 ```
 
@@ -113,7 +115,8 @@ nrc_sentiment <- tidy_sona_words %>%
   count(sentiment) %>% 
   mutate(sentiment = ifelse(is.na(sentiment), "not_in_nrc_lexicon", sentiment)) %>% 
   spread(key = sentiment, n, fill = 0) %>% 
-  rename(nrc_negative = negative, nrc_positive = positive)
+  rename(nrc_negative = negative, nrc_positive = positive) %>%
+  ungroup()
 
 ```
 
@@ -125,7 +128,8 @@ nrc_sentiment <- tidy_sona_words %>%
 sentiment_all <- bing_sentiment %>% 
   left_join(afinn_sentiment) %>% 
   left_join(nrc_sentiment)
-sentiment_all
 
+
+save(sentiment_all, file="sentiment_all.Rdata")
 ```
 

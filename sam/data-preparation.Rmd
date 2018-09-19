@@ -1,0 +1,35 @@
+---
+title: "DataPreProcess"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Data Preparation
+
+The data
+
+Duplicate file
+
+Invalid unicode charaters - likely related to text-to-speech processing.
+
+Leading BOM character not correctly parsed.
+
+Multiple characters not handled correctly by default parser. Cause issue with sentence tokenisation via *unnest_tokens*
+  Deleted
+  Converted to space, to handle both options and ranges
+  Handle bullet points correctly - assume leading phrase up to colon, and each bullet point, are separate sentences
+  Remove numbers and currency values with leading currency symbols
+  Assume certain punctuation is equivalen to sentence separator full stop
+  Remove redundant full stops (separated only by whitespace)
+  Collapse whitespace
+  Capitalise every characted after full stop, to ensure it is recognised as the start of a new sentence.
+  
+Unique sentence ids via digest function
+
+Exclude leading header text, due to commonality between speeches
+
+Remove sentences common to 2 or more speeches
+

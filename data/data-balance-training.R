@@ -40,12 +40,12 @@ balance_data = function(df, key_column) {
 
 
 if (!exists("balanced_train_data")) {
+  source("data/data-sampling.R")
   balanced_train_data_filename = "balanced_train_data.RData"
   if (file.exists(balanced_train_data_filename)) {
     load(file = balanced_train_data_filename)
   }
   else {
-    source("data/data-sampling.R")
     balanced_train_data = (balance_data(sentence_data$train, "president"))
     save(balanced_train_data, file = balanced_train_data_filename)
   }

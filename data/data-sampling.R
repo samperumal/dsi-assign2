@@ -8,16 +8,16 @@ load_test_and_train_data = function(df) {
   train = df[train_indices,]
   validate = df[-train_indices,]
 
-  return (list(train = train, validate = validate))
+  return (list(train = train, validate = validate, train_indices))
 }
 
 if (!exists("sentence_data")) {
+  source("data/data-preprocessing.R")
   sentence_data_filename = "sentence_data.RData"
   if (file.exists(sentence_data_filename)) {
     load(file = sentence_data_filename)
   }
   else {
-    source("data/data-preprocessing.R")
     sentence_data = load_test_and_train_data(input_data$sentences)
     save(sentence_data, file = sentence_data_filename)
   }
