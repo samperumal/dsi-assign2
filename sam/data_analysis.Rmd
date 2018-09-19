@@ -1,0 +1,103 @@
+---
+title: "Data Analysis"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+require(tidyverse)
+require(tidytext)
+
+knitr::opts_chunk$set(echo = FALSE, fig.width = 12)
+source("data/data-sampling.R")
+
+```
+
+# Data Preparation
+
+Initially we each performed our own import of the data, splitting out the year and president and tokenisation but we realised there was duplication of effort here and different naming conventions which made it difficult to collaborate and use each other's output. In addition, Sam noticed that some of the data was not being read in because of special characters and sentences were not being tokenised correctly for various reasons so he became responsible for performing the data clean up (preprocessing) and outputting a .RData file that we could all then use to rerun our work. 
+
+The data as provided consisted of 30 text files, with filenames encoding the president's name, the year of the speech, and whether it was pre/post an election (which is absent in non-election years). In working through the files, we discovered that two files were identical which was corrected in the data source with replacement. Additionally, in reading the files, we also identified 3 files that had one or more bytes which caused issues with the standard R file IO routines. Specifically 1 file had a leading Byte-Order-Mark (BOM) which is unique to windows operating system files, and 2 other files had invalid unicode characters, which suggests a text-to-speech processing application was used and experienced either transmissionor storage errors. In all the cases the offending characters were simply removed from the input files. 
+
+Having fixed basic read issues, we then examined the content of each file and the simplistic tokenisation achieved by applying *unnest_tokens* to the raw lines read in from the files. Several issues were uncovered, and in each case a **regular expression** was created to correct the issue in the raw read lines:
+
+ * There are multiple characters which are not handled correctly by the default parser, particularly where unicode characters are substituted for standard ASCII characters or are erroneously inserted as part of the text capture. This range of characters were simply removed from the text: **\"“”%’‘[]()–+¬>-**.
+ 
+ * Forward-slashes were converted to a space, to handle both options (hot/cold) and numeric ranges (1998/99).
+ 
+ * Bullet-pointed lists are interpreted as a single, exceptionally long sentence by default. We chose to split this up into a lead-in sentence terminated by a colon, and a list of sentences starting after the bullet point character (\*).
+ 
+ * Numbers (both with and without thousand separator characters) and currency values with leading currency symbols (R/$) were removed.
+ 
+ * Specific punctuation (ellipsis, colon, semi-colon) was considered equivalent to a sentence separator and converted to a full stop: **:;…¦...**.
+ 
+ * Full stops separated by only whitespace were considered redundany and collapsed to a single whitespace character.
+  
+ * All contiguous whitespace was collapsed to a single whitespace character.
+ 
+ * The *unnest_tokens* function relies on each new sentence starting with a capital letter. After the above fixes, it was was therefore necessary to capitalise every character after full stop, to ensure it is recognised as the start of a new sentence.
+ 
+Having fixed the text to allow correct sentence tokenisation, and applied the *unnest_tokens* function, we then determined a unique ID for each sentence by applying a hash digest function to the sentence text. This unique ID allowed everyone to work on the same data with confidence, and also enabled us to detect 72 sentences that appeared identically in at least 2 speeches. As these duplicates would potentially bias the analysis and training, all instances of duplicates were removed from the dataset.
+  
+One final note is that each speech starts with a very similar boiler plate referencing various attendees to the SONA in a single, run-on sentence. We believe this header does not add significantly to the content of the speech, and so we excluded all instances across all speeches.
+
+```{r fig.cap="Change in number of sentences per president before and after filtering."}
+comparison_data_set = bind_rows(
+  input_data$sentences %>% mutate(processing = +1), 
+  input_data$unfiltered_sentences %>% mutate(processing = -1)
+) %>% 
+  mutate(year2 = paste(year, ifelse(election == "post", " post", ""), sep = ""))
+
+grouped_data_set = comparison_data_set %>% 
+  group_by(president, year2, processing) %>%
+  summarise(count = n()) %>%
+  select(President = president, year = year2, processing, count) %>% 
+  mutate(signed_count = processing * count) 
+
+changed_data_set = grouped_data_set %>%
+  group_by(President, year) %>%
+  summarise(change = max(signed_count) + min(signed_count))
+  
+changed_data_set %>% ggplot() + geom_col(aes(x = year, y = change, fill = President)) + theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5)) + ylab("Number of sentences") + xlab("Year") + ggtitle("Change in number of sentences per president after filtering.")
+```
+
+The figure above shows the change in number of sentences per president after filtering. On the whole there are more sentences per president, with only a single reduction. Additionally, the highest increases are associated with the files where read-errors prevented us from previously reading the entire file. This change is equally evident in the boxplots below, which show the change in distribution per president of words and characters per sentence. 
+```{r}
+merged_sentences = bind_rows(input_data$sentences %>% mutate(filter = "Filtered"), input_data$unfiltered_sentences %>% mutate(filter = "Unfiltered"))
+
+merged_sentences %>% mutate(slen = str_length(sentence)) %>% ggplot(aes(x = president, y = slen, colour = president)) + geom_boxplot() + facet_grid(cols = vars(filter)) + xlab("President") + ylab("Sentence length in characters")
+```
+
+```{r}
+merged_words = bind_rows(input_data$words %>% mutate(filter = "Filtered"), input_data$unfiltered_words %>% mutate(filter = "Unfiltered"))
+
+merged_words %>% group_by(president, filter, id) %>% summarise(n = n()) %>% select(president, filter, n) %>% ggplot(aes(x = president, y = n, colour = president)) + geom_boxplot() + facet_grid(cols = vars(filter)) + xlab("President") + ylab("Sentence length in words")
+```
+
+Overall there is a much tighter grouping of sentences, with less variation and more conistent lengths, which is useful for techniques which depend on equal length inputs. The final histogram below shows the histogram of number of sentences per year/president after filtering, which still bears the same basic shape as before filtering, but with a better profile.
+
+```{r}
+grouped_data_set %>% 
+  filter(processing == 1) %>% 
+  ggplot() + geom_col(aes(x = year, y = count, fill = President)) + theme(axis.text.x=element_text(angle = 90,hjust = 1,vjust = 0.5)) + ylab("Number of sentences") + xlab("Year") 
+
+```
+
+
+# Data Sampling
+
+80% train, 20% validation
+
+Data is very unbalanced by president, so attempt to balance by supersampling from low sentence count presidents to ensure 
+each president has an equal number of sentences. Achieved by using sampling with replacement from 80% train data only (to ensure 
+there are no duplicates in the validation set that might skew validation error).
+
+Sam also assigned sentence id's using hashing and split the data into training and validation sets so that there would be consistency across what we were working on so that we could use each others work and compare results more easily.
+
+
+
+
+
+
+
+
+
