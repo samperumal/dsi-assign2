@@ -337,14 +337,15 @@ model <- keras_model_sequential() #Creating an empty sequential model
 #Define a model by sequentially adding layers. Add a simple model so it does not overfit.
 
 model %>%
-  layer_dense(units = 8, activation = 'relu', input_shape = ncol(x_train)) %>%
-  layer_dense(units = 8, activation = 'relu', kernel_regularizer = regularizer_l2(0.01)) %>%
+  layer_dense(units = 64, activation = 'relu', input_shape = ncol(x_train)) %>%
+  layer_dense(units = 64, activation = 'relu', kernel_regularizer = regularizer_l2(0.01)) %>%
   layer_dense(units = 6, activation = 'softmax')
 
 #See the number of parameteres:
 summary(model)
 
 #Compile and fit the model
+
 model %>% compile(
   optimizer = optimizer_rmsprop(lr = 0.003),
   loss = 'categorical_crossentropy',
@@ -353,8 +354,39 @@ model %>% compile(
 model %>% fit(x_train, y_train, epochs = 10, batch_size = 32, validation_data = list(x_test, y_test)
 ) %>% plot()
 
-model %>% evaluate(x_test, y_test, batch_size=32, verbose = 1)
+model %>% evaluate(x_test, y_test, batch_size=32, verbose = 1) #0.55886
+```
+This model has L2 regularization to avoid overfitting but even so it didn't help very much. The accuracy is 0.55886. The optimizer_rmsprop has learning rate 0.003. This was choosen after trying lr=c(0.001, 0.002, 0.003) To make readability easier the model with best learning rate is used. 
 
+As we can see from the plot model overfits after the second iteration, since the loss function start increasing in value, so to avoid that let's use a smaller model with less neurons and add a dropout.
+```{r}
+model <- keras_model_sequential() #Creating an empty sequential model
+
+#Define a model by sequentially adding layers. Add a simple model so it does not overfit.
+
+model %>%
+  layer_dense(units = 16, activation = 'relu', input_shape = ncol(x_train)) %>%
+  layer_dropout(0.03) %>%
+  layer_dense(units = 16, activation = 'relu', 
+              kernel_regularizer = regularizer_l2(0.01)) %>%  #Dense layer with L2 regulerizer 
+  layer_dropout(0.01) %>%
+  layer_dense(units = 6, activation = 'softmax') %>%       #6 neurons since we have six presidents
+  compile(
+  optimizer = optimizer_rmsprop(lr = 0.003),  
+  loss = 'categorical_crossentropy',
+  metrics = c('accuracy')
+)
+
+#See the number of parameteres:
+summary(model)
+
+model %>% fit(x_train, y_train, epochs = 10, batch_size = 32, validation_data = list(x_test, y_test)
+) %>% plot()
+
+model %>% evaluate(x_test, y_test, batch_size=32, verbose = 1) #0.5811648
+#This smaller model gave a better accuracy result than the one that has no dropout 
+
+#Get the predictions for the model
 predictions <- model %>% predict(x_test)
 predictions2 = model %>% predict_classes(x_test)
 range(predictions)
@@ -375,12 +407,30 @@ predictions_val <- cbind(test_sona, pres.actual, pres.max)
 predictions_val = predictions_val %>% select(prez, pres.actual, pres.max)
 
 
-t <- table(predictions_val$pres.actual, predictions_val_2$pres.max)
-paste0("Accuracy rate is:" , sum(diag(t))/sum(t))
+table <- table(predictions_val$pres.actual, predictions_val_2$pres.max)
+paste0("Accuracy rate is:" ,round((sum(diag(table))/sum(table)),4))
+
+
+# Calculate kappa by hand
+t = as.matrix(table)
+kappa(t)
+
+
+t = cbind(t, "4" = colSums(t)/sum(colSums(t)))
+t = rbind(t, "7" = rowSums(t)/sum(rowSums(t)))
+t[7,4] = 0
+
+prob_a = sum(diag(table))/sum(colSums(table))
+prob_b = (t[7,1]*t[1,4]) + (t[7,2]*t[2,4]) +(t[7,3]*t[3,4])
+
+k = (prob_a - prob_b)/(1-prob_b)
+
+paste0("Kappa value is ", round(k, 3), ", and this means the results have no agreement!")
 
 ```
 
-Note that it is the same accuracy rate as we have found with model %>% evaluate(). 60.84% accuracy just for the word-count model seems good enough. But this model does not consider how important each word is to its corpus. So we should consider a better model to try.
+The accuracy is slightly better than bigger model with no-dropouts (0.581%)
+Just for the word-count model seems good enough. But this model does not consider how important each word is to its corpus. So we should consider a better model to try.
 
 After the fourth iteration validation loss starts increasing which is a sign of overfitting. 
 
@@ -454,12 +504,8 @@ y_train = (response_tokenizer$texts_to_matrix(labels_train, mode = "binary"))[,-
 #Define the model
 
 model <- keras_model_sequential() #Creating an empty sequential model
-
-#Define a model by sequentially adding layers.
-
 model %>%
   layer_dense(units = 8, activation = 'relu', input_shape = ncol(x_train)) %>%
-  
   layer_dense(units = 8, activation = 'relu', kernel_regularizer = regularizer_l2(0.01)) %>%
   layer_dense(units = 6, activation = 'softmax') %>%
   compile(
@@ -467,11 +513,10 @@ model %>%
   loss = 'categorical_crossentropy',
   metrics = c('accuracy')
 )
-
 model %>% fit(x_train, y_train, epochs = 10, batch_size = 32, validation_data = list(x_test, y_test)
 ) %>% plot()
 
-model %>% evaluate(x_test, y_test, batch_size=32, verbose = 1) #0.6183395 accuracy rate
+model %>% evaluate(x_test, y_test, batch_size=32, verbose = 1) #0.6146221 accuracy rate
 
 
 predictions <- model %>% predict(x_test)
@@ -494,13 +539,154 @@ predictions_val <- cbind(test_sona, pres.actual, pres.max)
 predictions_val = predictions_val %>% select(prez, pres.actual, pres.max)
 
 
-t <- table(predictions_val$pres.actual, predictions_val_2$pres.max)
-paste0("Accuracy rate is:" , sum(diag(t))/sum(t))
+table <- table(predictions_val$pres.actual, predictions_val_2$pres.max)
+paste0("Accuracy rate is:" , round((sum(diag(t))/sum(t)),4))
+
+# Calculate kappa by hand
+t = as.matrix(table)
+t = cbind(t, "4" = colSums(t)/sum(colSums(t)))
+t = rbind(t, "7" = rowSums(t)/sum(rowSums(t)))
+t[7,4] = 0
+
+prob_a = sum(diag(table))/sum(colSums(table))
+prob_b = (t[7,1]*t[1,4]) + (t[7,2]*t[2,4]) +(t[7,3]*t[3,4])
+
+k = (prob_a - prob_b)/(1-prob_b)
+
+paste0("Kappa value is ", round(k, 3), ", and this means the results have no agreement!")
 
 ```
-This gives us exactly the same results as the word-count model. But the algorithm learns after
-###GloVe word embeddings
+###Neural Nets with Sentiment Analysis Data
+```{r}
+#The preparation of this file can be found in the same directory as the .Rdata file.
 
+load("~/Downloads/dsi-assign2/merve/sentiment_all.Rdata")
+
+set.seed(123)
+
+training_ids <- sentiment_all %>% 
+  group_by(president) %>% 
+  sample_frac(0.9) %>% 
+  ungroup() %>%
+  select(sentence_id)
+
+training_sona <- sentiment_all %>% 
+  right_join(training_ids, by = "sentence_id") %>%
+  select(-sentence_id)
+
+test_sona <- sentiment_all %>% 
+  anti_join(training_ids, by = "sentence_id") %>%
+  select(-sentence_id)
+
+
+# Seperate response variable
+dim(sentiment_all) #7286   31
+x_train <- as.matrix(training_sona %>% select(-president, -filename))
+x_test <- as.matrix(test_sona %>% select(-president, -filename))
+
+
+#One-hot encoding for response variable
+labels_test = test_sona %>% select(president) %>% unlist()
+president_count = labels_test %>% as_tibble() %>% unique() %>% count()
+response_tokenizer = text_tokenizer(num_words = president_count+1)
+response_tokenizer$fit_on_texts(labels_test)
+# Extract response vector, ignoring first (empty) column
+y_test = (response_tokenizer$texts_to_matrix(labels_test, mode = "binary"))[,-1]
+
+labels_train = training_sona %>% select(president) %>% unlist()
+president_count = labels_train %>% as_tibble() %>% unique() %>% count()
+response_tokenizer = text_tokenizer(num_words = president_count + 1)
+response_tokenizer$fit_on_texts(labels_train)
+# Extract response vector, ignoring first (empty) column
+y_train = (response_tokenizer$texts_to_matrix(labels_train, mode = "binary"))[,-1]
+
+model <- keras_model_sequential() #Creating an empty sequential model
+
+#Define a model by sequentially adding layers.
+
+model %>%
+  layer_dense(units = 16, activation = 'relu', input_shape = ncol(x_train)) %>%
+  layer_dense(units = 16, activation = 'relu', kernel_regularizer = regularizer_l1_l2(l1 = 0.01, l2 = 0.01), bias_initializer = initializer_glorot_normal()) %>%
+  layer_dense(units = 6, activation = 'softmax') %>%
+  compile(
+    loss = 'categorical_crossentropy',
+    optimizer = optimizer_rmsprop(lr = 0.003),
+    metrics = c('accuracy')
+  )
+
+model %>% fit(x_train, y_train, epochs = 10, batch_size = 32 ) %>% plot()
+
+(accuracy_sentiment = (model %>% evaluate(x_test, y_test))$acc)
+
+paste0("Accuracy of sentiment analysis is ", round(accuracy_sentiment,3))
+```
+### Neural Nets with Topic Modelling Gamma Values
+```{r}
+load("~/Downloads/dsi-assign2/vanessa/topic_matrix.RData")
+
+sona_gamma = topic_matrix
+sona_gamma[is.na(sona_gamma)] <- 0
+sona_gamma = sona_gamma %>% select(-year, -election, -sentence)
+
+#Prepare train-test indices
+set.seed(321)
+training_ids <- sona_gamma %>% 
+  group_by(president) %>% 
+  sample_frac(0.9) %>% 
+  ungroup() %>%
+  select(id)
+
+training_sona <- sona_gamma %>% 
+  right_join(training_ids, by = "id") %>%
+  select(-id)
+
+test_sona <- sona_gamma %>% 
+  anti_join(training_ids, by = "id") %>%
+  select(-id)
+
+
+# Seperate response variable
+dim(sona_gamma) #6626 rows 10626 cols
+x_train <- as.matrix(training_sona %>% select(-president))
+x_test <- as.matrix(test_sona %>% select(-president), ncol = 7364)
+
+#One-hot encoding for response variable
+labels_test = test_sona %>% select(president) %>% unlist()
+president_count = labels_test %>% as_tibble() %>% unique() %>% count()
+response_tokenizer = text_tokenizer(num_words = president_count + 1)
+response_tokenizer$fit_on_texts(labels_test)
+# Extract response vector, ignoring first (empty) column
+y_test = (response_tokenizer$texts_to_matrix(labels_test, mode = "binary"))[,-1]
+
+labels_train = training_sona %>% select(president) %>% unlist()
+president_count = labels_train %>% as_tibble() %>% unique() %>% count()
+response_tokenizer = text_tokenizer(num_words = president_count + 1)
+response_tokenizer$fit_on_texts(labels_train)
+# Extract response vector, ignoring first (empty) column
+y_train = (response_tokenizer$texts_to_matrix(labels_train, mode = "binary"))[,-1]
+
+
+#Create the model
+model <- keras_model_sequential() #Creating an empty sequential model
+
+#Define a model by sequentially adding layers.
+
+model %>%
+  layer_dense(units = 16, activation = 'relu', input_shape = ncol(x_train)) %>%
+  layer_dense(units = 16, activation = 'relu', kernel_regularizer = regularizer_l1_l2(l1 = 0.01, l2 = 0.01),    bias_initializer = initializer_glorot_normal()) %>%
+  layer_dense(units = 6, activation = 'softmax') %>%
+  compile(
+    loss = 'categorical_crossentropy',
+    optimizer = optimizer_rmsprop(lr = 0.003),
+    metrics = c('accuracy')
+  )
+
+model %>% fit(x_train, y_train, epochs = 10, batch_size = 32 ) %>% plot()
+
+model %>% evaluate(x_test, y_test)
+```
+
+###GloVe word embeddings
 We will be using GloVe embeddings. "GloVe is an unsupervised learning algorithm for obtaining vector representations for words. Training is performed on aggregated global word-word co-occurrence statistics from a corpus, and the resulting representations showcase interesting linear substructures of the word vector space." 
 GloVe stands for "Global Vectors for Word Representation". It's a popular embedding technique.
 [Reference:Jeffrey Pennington, Richard Socher, and Christopher D. Manning. 2014. GloVe: Global Vectors for Word Representation:https://nlp.stanford.edu/pubs/glove.pdf ]
