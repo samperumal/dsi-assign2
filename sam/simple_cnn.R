@@ -89,3 +89,11 @@ model %>%
     epochs = 10,
     validation_data = list(validate$x, validate$y)
   )
+
+predictions = model %>% predict_classes(validate$x)
+actuals = apply(validate$y, 1, which.max)
+comparison = cbind(predictions, actuals, isequal = ifelse(predictions == actuals, 1, 0))
+
+View(comparison[comparison[,1] == comparison[,2],])
+
+sum(comparison[,3]) / nrow(comparison)

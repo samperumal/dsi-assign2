@@ -57,19 +57,18 @@ sona$president <- unlist(str_extract_all(sona$filename, '(?<=_)[^_]+(?=.txt)'))
 ```{r tokenize}
 
 # sentence tokenization
-tidy_sona_sentences <- sona %>% 
-  unnest_tokens(text, speech, token = "sentences")
+tidy_sona_sentences <- input_data$sentences 
 # add an ID variable for sentences
 tidy_sona_sentences <- rowid_to_column(tidy_sona_sentences, "sentence_id")
 
 # word tokenization
 tidy_sona_words <- tidy_sona_sentences %>% 
-  unnest_tokens(word, text, token = "words") %>% 
+  unnest_tokens(word, sentence, token = "words") %>% 
   filter(!word %in% stop_words$word, str_detect(word, "[a-z]"))  # remove stop words
 
 # bigram tokenization
 bigrams <- tidy_sona_sentences %>% 
-  unnest_tokens(bigram, text, token = "ngrams", n = 2)
+  unnest_tokens(bigram, sentence, token = "ngrams", n = 2)
 # separate the bigrams 
 bigrams_separated <- bigrams %>%
   separate(bigram, c("word1", "word2"), sep = " ")
@@ -92,7 +91,7 @@ tidy_sona_bigrams <- bigrams_filtered %>%
 # bing sentiment per sentence
 bing_sentiment <- tidy_sona_words %>%
   left_join(get_sentiments("bing")) %>%
-  group_by(filename, sentence_id) %>% 
+  group_by(year, election, id) %>% 
   count(sentiment) %>%
   mutate(sentiment = ifelse(is.na(sentiment), "not_in_bing_lexicon", sentiment)) %>% 
   spread(sentiment, n, fill = 0) %>%

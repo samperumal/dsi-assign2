@@ -5,31 +5,19 @@ require(dplyr, quietly = TRUE)
 require(tidytext, quietly = TRUE)
 
 #####LoadData
-load("input_data.RData")
-load("balanced_train_data.RData")
-load("sentence_data.RData")
+load("data/input_data.RData")
+load("data/balanced_train_data.RData")
+load("data/sentence_data.RData")
 
 
-#######SAM - this is where I get confused!!
 ### Calculate distinct number of words in corpus
-max_words = input_data$words %>% select(word) %>% unique() %>% count()
-
-#why are we only taking 90% of words?
-max_words = 0.9 * max_words # Only take specified percentage of words
+max_words = as.numeric(input_data$words %>% select(word) %>% unique() %>% count())
 #max_words
-#max_words = 10657 or 9591.3
-# Calculate maximum word count in any sentence
-max_length= input_data$words %>% group_by(id) %>% summarise(n = n()) %>% arrange(desc(n))
+max_length= as.numeric(as.matrix(input_data$words %>% group_by(id) %>% summarise(n = n()) %>% arrange(desc(n)))[1,2])
 #max_length
-#max_length = 119
-min_length= input_data$words %>% group_by(id) %>% summarise(n = n()) %>% arrange((n))
+min_length= as.numeric(as.matrix(input_data$words %>% group_by(id) %>% summarise(n = n()) %>% arrange((n)))[1,2])
 #min_length
-#min_length =  1
 
-
-#why when this is different?
-min_length = 7
-max_length = 80
 
 # Extract sentences and presidents
 sentences = input_data$sentences %>% select(sentence) %>% unlist()
@@ -60,7 +48,6 @@ tokenize_data = function(data_list) {
 }
 
 # Transform test and validation sets
-#Also Sam - not sure but it seems to drop 4 lines here.
 train = tokenize_data(balanced_train_data)
 validate = tokenize_data(sentence_data$validate)
 
@@ -70,14 +57,11 @@ validate = tokenize_data(sentence_data$validate)
 val_x <- validate$x
 val_y <- validate$y
 
-
 ############################
 #FEATURES OF NN
 ##########################
-#Sam - this is also where I get confused
-
-max_features <- 10657
-maxlen <- 80
+max_features <- max_words
+maxlen <- max_length
 batch_size <- 32
 embedding_dims <- 70
 filters <- 250
@@ -85,13 +69,6 @@ kernel_size <- 3
 hidden_dims <- 250
 epochs <- 10
 
-#min_length = 7
-#max_length = 80
-#max_words = 10657
-#max_length = 119
-#min_length =  1
-#max_features <- max_words  # choose max_features most popular words
-#embedding_dims <- 70       # number of dimensions for word embedding
 
 ###############################
 ##Model!!
@@ -120,16 +97,16 @@ model_attempt %>%
   layer_dropout(0.2) %>%
   layer_activation("relu") %>%
   
-  # Project onto a 6 unit output layer, and squash it with a sigmoid
+  # Project onto a 6 unit output layer, and a softmax to push into output layer
   
   layer_dense(president_count) %>%
-  layer_activation("sigmoid")
+  layer_activation("softmax")
 
 # Compile model
 model_attempt %>% compile(
   loss = "binary_crossentropy",
   optimizer = "adam",
-  metrics = "accuracy"
+  metrics = "categorical_accuracy"
 )
 
 # Training ----------------------------------------------------------------
@@ -138,7 +115,7 @@ model_attempt %>%
   fit(
     train$x, train$y,
     batch_size = batch_size,
-    epochs = epochs,
+    epochs = 7,
     validation_data = list(val_x, val_y)
   )
 
@@ -151,21 +128,24 @@ model_attempt
 ########Look at export
 ##This is just me trying to see if its actucally predicting
 
-predictions <- model_attempt %>% predict(val_x)
-
-
-#Getting the max of each rows prediction and binding it on the end
-pres.max <- as.data.frame(predictions)
-pres.max <- apply(predictions,1,which.max) 
-pres.max <- unlist(as.numeric(as.character(pres.max)))
-pres.max <- cbind(predictions,pres.max )
-
+predictions <- model_attempt %>% predict_classes(val_x)
 
 pres.actual <- as.data.frame(val_y)
 pres.actual <- apply(val_y,1,which.max) 
 
 
-predictions_val <- cbind(pres.max,pres.actual)
-head(predictions_val)
-##I can't connect back to sentecne as the tokeniser drops 4 lines?
+predictions_val <- cbind(sentence_data$validate,predictions,pres.actual)
+predictions_val$predictions <-  predictions_val$predictions + 1
 
+
+##CHECKS
+max(predictions_val$predictions)
+min(predictions_val$predictions)
+
+t <- table(predictions_val$pres.actual, predictions_val$predictions)
+sum(diag(t))/sum(t)
+
+
+saveRDS(model_attempt, "simple_cnn.rds")
+
+mod2 <- readRDS("mymodel.rds")
