@@ -5,22 +5,22 @@ source("sam/nn-setup.R")
 
 # Embedding
 max_features = 20000
-maxlen = 100
+maxlen = 120
 embedding_size = 50
 
-data = setup_nn(0.9, 10, maxlen, FALSE)
+data = setup_nn(1.0, 8, maxlen, FALSE)
 
 # Convolution
 kernel_size = 5
-filters = 64
-pool_size = 4
+filters = 256
+pool_size = 3
 
 # LSTM
 lstm_output_size = 70
 
 # Training
 batch_size = 32
-epochs = 5
+epochs = 10
 
 # Data Preparation --------------------------------------------------------
 
@@ -60,13 +60,13 @@ model %>%
     activation = "relu",
     strides = 1
   ) %>%
-  layer_max_pooling_1d(pool_size) %>%
+  layer_max_pooling_1d() %>%
   layer_lstm(lstm_output_size) %>%
   layer_dense(6) %>%
-  layer_activation("sigmoid")
+  layer_activation("softmax")
 
 model %>% compile(
-  loss = "binary_crossentropy",
+  loss = "categorical_crossentropy",
   optimizer = "adam",
   metrics = "accuracy"
 )
@@ -79,3 +79,13 @@ model %>% fit(
   epochs = epochs,
   validation_data = list(data$validate$x, data$validate$y)
 )
+
+#model = model_attempt
+predictions = model %>% predict_classes(data$validate$x) + 1
+actuals = apply(data$validate$y, 1, which.max)
+comparison = cbind(predictions, actuals, isequal = ifelse(predictions == actuals, 1, 0))
+
+#View(comparison[comparison[,1] == comparison[,2],])
+
+sum(comparison[,3]) / nrow(comparison)
+
