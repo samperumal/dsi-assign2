@@ -5,9 +5,9 @@ require(dplyr, quietly = TRUE)
 require(tidytext, quietly = TRUE)
 
 #####LoadData
-load("data/input_data.RData")
-load("data/balanced_train_data.RData")
-load("data/sentence_data.RData")
+load("input_data.RData")
+load("balanced_train_data.RData")
+load("sentence_data.RData")
 
 
 #######SAM - this is where I get confused!!

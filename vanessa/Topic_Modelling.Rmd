@@ -3,6 +3,7 @@ title: "R Notebook"
 output:
   html_document:
     df_print: paged
+always_allow_html: yes
 ---
 
 ```{r global_options, include=FALSE}
@@ -19,40 +20,43 @@ library(dplyr)
 library(tidytext)
 library(topicmodels)
 library(ldatuning)
+library(wordcloud2)
+
+
 
 ```
-
 
 ##Topic Modelling
 
 
-An effective topic model can sumamrise the ideas and concets within a docuemnts - this can be used in varous ways.  A user can understand the main themes within the corpus of documents and draw conculisions from these from simple analysis or can use the infomation as type of dimesional reduction and feed these topics into different supervised or unsupervised algorthims.
+An effective topic model can summarise the ideas and concepts within a document - this can be used in various ways.  A user can understand the main themes within the corpus of documents and draw conclusions from these from analysis of these topics or they can use the information as type of dimensional reduction and feed these topics into different supervised or unsupervised algorithms.
 
-In this project, our group has used topic modelling to better understand the common topics that come up over the SONA spechs, how these are realted to different presidents and speeches and how they change over time.  In addtion, we have used these tp help classify which sentence was said by which president (see Section XX)
+In this project, our group has used topic modelling to better understand the common topics that come up over the SONA speeches, how these are related to different presidents and speeches and how they change over time.  In addition, the probability that a sentence belongs to a certain topic was used in an attempt to classify which sentence was said by which president (see Section XX)
 
 ###Data
 
-The data used in this section is the clean and processed data as described in Section X.
+The data used in this section is the clean and processed data as described in Section X.  The resulting sentence data has been used and dissected further without consideration to train and validation unless otherwise stated. 
 
 
-###Methodolgy
+###Methodology
 
-The following methodoly was followed:
+The following methodology was followed:
 
-1. Each sentence was tokeniseised into "bigrams", stop words removed and a document-term matrix set up
-    Bigrams were chosen over idvidual words as they provided more context and meaning.
-2. Four optimisation techniques were used to help determine the number of topics that are covered in the corpus of documents
+1. Each sentence was tokenised into "bigrams", stop words removed and a document-term matrix set up
+    Bigrams were chosen over individual words as they provided more context and meaning.
+2. An optimisation technique was used to help determine the number of topics that are covered in the corpus of documents and this optimisation was validated on a hold out sample.
 3. Latent Dirichlet allocation was used to determine the probability of bigrams belong to certain topics and the probability that sentences belonged to topics.
-4. Text mining methods were delpyed to extract insight into the different topics
+4. Text mining methods were deployed to extract insight into the different topics
 5. The probability of sentences to each topics were then passed through to a neural network.
 
 ####Step One: Tokenisation, Remove Stop words and Document Term Matrix
+
 
 ```{r, echo = TRUE}
 
 #Load data
 load("../input_data.RData")
-
+#Get sentence data
 inputdata <- input_data$sentences
 
 #Getting Bigrams out
@@ -75,27 +79,13 @@ bigrams_united <- bigrams_filtered %>%
   unite(bigram, word1, word2, sep = " ")
 
 
-#create term count to feed into DTM
-bigrams_count <- bigrams_united %>%
-  group_by(id, bigram) %>%
-  summarise(count_bigram = n()) %>%
-  select(id, bigram, count_bigram) %>%
-  arrange(desc(count_bigram))
-
-
-#create document term matrix (DTM)
-dtm_grams <- bigrams_count %>% 
-cast_dtm(id, bigram, count_bigram)
-
-
 #Lets see what the most commonly used terms are
 bigrams_count_plot <- bigrams_united %>%
   group_by(bigram) %>%
   summarise(count_bigram = n()) %>%
   select(bigram, count_bigram) %>%
   arrange(desc(count_bigram))
-
-
+#plot these top terms
 bigrams_count_plot %>%
   top_n(20, count_bigram) %>%
   ungroup() %>%
@@ -105,14 +95,44 @@ ggplot(aes(bigram, count_bigram)) +
   coord_flip()
 
 
+
+```
+
+After tokenisation and removal of stop words, the top 20 most used terms across all of the SONA speeches are displayed.  Unsurprisingly, "South Africa" is the most used term followed closely by "South African" and "South Africans".  These terms do not add to our understanding of the topics and tend to confuse the topic modelling going forward.  The removal of the terms allows for a cleaner interpretation.  "Public service and "Local Government" are then the most used terms.
+
+
+```{r}
+
+#create term count to feed into DTM
+bigrams_count <- bigrams_united %>%
+  group_by(id, bigram) %>%
+  summarise(count_bigram = n()) %>%
+  select(id, bigram, count_bigram) %>%
+  arrange(desc(count_bigram))
+
+
+#remove the terms from the data set
+bigrams_count <- bigrams_count %>% 
+    filter (bigram != "south africa") %>%
+    filter (bigram != "south african") %>%
+    filter (bigram != "south africans") %>%
+      filter (bigram != "local government")
+
+
+#create document term matrix (DTM)
+dtm_grams <- bigrams_count %>% 
+cast_dtm(id, bigram, count_bigram)
+
+
 ```
 
 
-After tokinisation and removal of stop words, the top 20 most used terms across all of the SONA speeches are displayed.  Unsurpisringly, "South Africa" is the most used terms followed closly by "South African" and"South Africans".  "Public service and "Local Goverment" are then the ost used terms.
 
 ###Step 2: Optimisation of k - the number of topics.
 
-A pre-requiste of topic modelling is understanding the number of topics (latent factor k) that each corpus may contain.  In some cases, this may be a fair assumption but as in our case, how would we, without reading though each speech, know how many different topics would be discussed?  Luckily, Murzintcev Nikita has published a R- package (ldatuning) that helps to optimise the number of topics(k) over four different measure. The three measures used to determine the number of topics, are discussed in an RPubs paper which can found here: http://www.rpubs.com/MNidhi/NumberoftopicsLDA and the following otpimisation largely follows the accomapying vingette: https://cran.r-project.org/web/packages/ldatuning/vignettes/topics.html
+A pre-requisite of topic modelling is knowing the number of topics that each corpus may contain (i.e. the latent factor k) In some cases, this may be a fair assumption but without reading though each speech, how  could one know how many different topics have been articulated in the SONA's?  Luckily, Murzintcev Nikita has published an R- package (ldatuning) that helps to optimise the number of topics (k) over three different measures. The measures used to determine the number of topics, are discussed in an RPubs paper which can found here: http://www.rpubs.com/MNidhi/NumberoftopicsLDA and the following optimisation largely follows the accompanying vignette: https://cran.r-project.org/web/packages/ldatuning/vignettes/topics.html
+
+The following extract from the RPub paper gives a brief explanation of the methods used to optimise for k:
 
 *Extract from RPubs*
 
@@ -123,27 +143,32 @@ A pre-requiste of topic modelling is understanding the number of topics (latent 
 *Griffths: To evaluate the consequences of changing the number of topics T, used the Gibbs sampling algorithm to obtain samples from the posterior distribution over z at several choices of T(minimize)*"
 
 
+In addition to this, Nikita considers how the number of k may change over a validation or hold out sample.  His term for this is*"perplexity"* which he defines as *"[it] measures the log-likelihood of a held-out test set; Perplexity is a measurement of how well a probability distribution or probability model predicts a sample"*
+
+Below is an attempt to optimise for k and to check that the choice of k holds over an unseen data set.
 
 ```{r, }
-
+#sepertate the bigrams into a train and test set
+#ungroup the daat
 bigrams_sample <- bigrams_count %>% ungroup()
-
+#number of rows
 n =nrow(bigrams_sample)
-
+#sample from data
 index = sample(1:nrow(bigrams_sample), round(n*0.8,0))
 
-
+#seperate into test and train
 train_data <- bigrams_sample[index,]
 test_data <- bigrams_sample[-index,]
 
 
-
+#put train and test into the DTM matrix formats
 dtm_train <- train_data %>% 
 cast_dtm(id, bigram, count_bigram)
 
 dtm_test <- test_data %>% 
 cast_dtm(id, bigram, count_bigram)
 
+#optimise for k
 result <- FindTopicsNumber(
   dtm_train,
   topics = seq(from = 2, to = 15, by = 1),
@@ -153,21 +178,23 @@ result <- FindTopicsNumber(
   mc.cores = 2L,
   verbose = FALSE
 )
-
+#plot the measures
 FindTopicsNumber_plot(result)
 
 ```
 
-From the above plot, the marginal benefit from adding another topic, stops at around 10 topics.  In order to test this, we can check the *"perplexity"* over a test sampe for the document term matrix (which occrding to Nikita *"measures the log-likelihood of a held-out test set; Perplexity is a measurement of how well a probability distribution or probability model predicts a sample"*)
-
+From the above plot, the marginal benefit from adding another topic, stops at around 8-10 topics.  In order to test this, the *"perplexity"* over a test sample for the document term matrix can be checked.
 
 ```{r}
+#initalise loop
 perplexity_df <- data.frame(train=numeric(), test=numeric())
+#set patamaets
 topics <- c(2:15)
 burnin = 100
 iter = 1000
 keep = 50
 
+#loop to test over train and test
 set.seed(12345)
 for (i in topics){
  
@@ -180,130 +207,390 @@ for (i in topics){
 
 ##plotting the perplexity of both train and test
 
-g <- ggplot(data=perplexity_df, aes(x= as.numeric(row.names(perplexity_df)))) + labs(y="Perplexity",x="Number of topics") + ggtitle("Perplexity of hold out  and training data")
+g <- ggplot(data=perplexity_df, aes(x= as.numeric(row.names(perplexity_df)))) + labs(y="Perplexity",x="Number of topics") + ggtitle("Perplexity of hold out and training data") + scale_x_discrete(limits = topics)
 
 g <- g + geom_line(aes(y=test), colour="red")
-g <- g + geom_line(aes(y=train), colour="green")
+g <- g + geom_line(aes(y=train), colour="blue")
 g 
 ```
 
+As more topics are used, the perplexity of the training sample does decrease but that of the test sample increases from around 11 topic.  The perplexity of the test sample seems to be minimised at around 8 topics.  
+
+The evidence from these two plots suggest that the optimal number topics sits at around 8 topics.  
+
+###Step 3: Latent Dirichlet allocation 
+
+
+For this assignment, Latent Dirichlet allocation (LDA) was used for the topic modelling.  Other methods, such as a Latent Semantic Analysis (LSA) or Probabilistic Latent Semantic Analysis (pLSA) could have been used but LDA is useful due to the fact that it allows:
+      1. Each document within the corpus to be a mixture of topics
+      2. Each topic to be a mixture of bigrams
+      3. The topics are assumed to be drawn from Dirichlet distribution (i.e. not k different distributions as with pLSA) so there are less parameters to estimate and no need to estimate the probability that the corpus generates a specific document.
+      
+      
+      
+```{r}
+
+##chose 5 topics
+#set seed
+set.seed(1234)
+#run teh LDA with full dtm matrix
+topics_lda <- LDA(dtm_grams, k = 5, control = list(seed = 1234))
+
+#get ther bigrams out from model
+term <- as.character(topics_lda@terms)
+#bind the betas and the topics together
+speech_topics <- as.tibble(cbind(term, t(topics_lda@beta)))
+#lables for the data
+colnames(speech_topics) <- c("Bigrams", "topic1","topic2","topic3","topic4","topic5")
+
+#gathers into tidy format 
+#note a term should appear more than once.
+speech_topics <- speech_topics %>% 
+  gather(topic1
+         , topic2
+         , topic3
+         , topic4
+         , topic5
+         , key = "topic", value = "beta")
+
+
+##mutate the betas
+speech_topics <- speech_topics %>%
+  mutate(beta = as.numeric(beta)) %>%
+  mutate(beta = exp(beta))
+
+
+```
+      
+The beta matrix produced gives the probablity of the topic prodcusing that bigram (i.e. that the phrase is in reference to that topic.)  From this measure, one can get a sense of what the topic is about. By using the most popular phrases in each topic, understanding of the flavour of each topic.
+
+####Topic One
+
+From the display of popular terms, it can be determined that the topic one has a connection of job creatinn - this is the most common terms but is supported by other terms that have a high proabbility of being generated by this topic such as: 
++ world cup
++ 
+
+
+```{r}
+###Topic 1
+
+#filter for topic one
+top_terms.1 <- speech_topics %>%
+  filter(topic == "topic1") %>%
+  group_by(topic) %>%
+  top_n(30, beta) %>%
+  ungroup() %>%
+  arrange(topic, -beta)
+##plot the most popluar terms
+plot_topic_1 <- top_terms.1 %>%
+  mutate(Bigrams = reorder(Bigrams, beta)) %>%
+  ggplot(aes(Bigrams, beta, fill = factor(topic))) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~ topic, scales = "free") +
+  coord_flip()
+
+#set up for word cloud
+maxs <- max((top_terms.1$beta*100))
+mins <- min(top_terms.1$beta*100)
+
+
+word_count.1 <- top_terms.1 %>%
+  mutate(freq = scale(beta*100, center = mins, scale = maxs - mins)) %>%
+  select(Bigrams, freq)
 
 
 
+#word cloud
+set.seed(12345)
+wordcloud.1 <- wordcloud2(word_count.1, color = "random-dark", size = .4)
+
+par(mfrow= c(2,1))
+plot_topic_1
+set.seed(12345)
+wordcloud.1
+```
 
 
+####Topic Two
 
-<!-- ```{r} -->
-<!-- ###Topic 1 -->
+ECNOMIC/ Crime and Justice
 
-<!-- top_terms.1 <- speech_topics %>% -->
-<!--   filter(topic == "topic1") %>% -->
-<!--   group_by(topic) %>% -->
-<!--   top_n(50, beta) %>% -->
-<!--   ungroup() %>% -->
-<!--   arrange(topic, -beta)  -->
-
-<!-- plot_topic_1 <- top_terms.1 %>% -->
-<!--   mutate(Bigrams = reorder(Bigrams, beta)) %>% -->
-<!--   ggplot(aes(Bigrams, beta, fill = factor(topic))) + -->
-<!--   geom_col(show.legend = FALSE) + -->
-<!--   facet_wrap(~ topic, scales = "free") + -->
-<!--   coord_flip() -->
-
-
-<!-- word_count.1 <- top_terms.1 %>% -->
-<!--   filter(topic == "topic1") %>% -->
-<!--   mutate(freq = round(scale(beta*1000),0) + 1) %>% -->
-<!--   select(Bigrams, freq) -->
-
-
-<!-- wordcloud.1 <- wordcloud2(word_count.1, color = "random-dark") -->
-
-<!-- par(mfrow= c(2,1)) -->
-<!-- plot_topic_1 -->
-<!-- wordcloud.1 -->
-
-<!-- #  -->
-<!-- # ##Topic 1 an 2 -->
-<!-- # small_topic <- speech_topics %>% -->
-<!-- #   filter(topic == "topic1"|topic == "topic2") -->
-<!-- #  -->
-<!-- # beta_spread <- small_topic %>% -->
-<!-- # #  mutate(topic = paste0("topic", topic)) %>% -->
-<!-- #   spread(topic, beta) %>% -->
-<!-- #   filter(topic1 > .001 | topic2 > .001) %>% -->
-<!-- #   mutate(log_ratio = log2(topic1 / topic2)) -->
-<!-- #  -->
-<!-- # beta_spread %>% -->
-<!-- #   group_by(direction = log_ratio > 0) %>% -->
-<!-- #   top_n(10, abs(log_ratio)) %>% -->
-<!-- #   ungroup() %>% -->
-<!-- #   mutate(Bigrams = reorder(Bigrams, log_ratio)) %>% -->
-<!-- #   ggplot(aes(Bigrams, log_ratio)) + -->
-<!-- #   geom_col() + -->
-<!-- #   labs(y = "Log2 ratio of beta in topic 1 / topic 2") + -->
-<!-- #   coord_flip() -->
-<!-- #  -->
-<!-- #  -->
-<!-- # #Topic 1 and 3 -->
-<!-- #  -->
-<!-- # small_topic <- speech_topics %>% -->
-<!-- #   filter(topic == "topic1"|topic == "topic3") -->
-<!-- #  -->
-<!-- # beta_spread <- small_topic %>% -->
-<!-- # #  mutate(topic = paste0("topic", topic)) %>% -->
-<!-- #   spread(topic, beta) %>% -->
-<!-- #   filter(topic1 > .001 | topic3 > .001) %>% -->
-<!-- #   mutate(log_ratio = log2(topic1 / topic3)) -->
-<!-- #  -->
-<!-- # beta_spread %>% -->
-<!-- #   group_by(direction = log_ratio > 0) %>% -->
-<!-- #   top_n(10, abs(log_ratio)) %>% -->
-<!-- #   ungroup() %>% -->
-<!-- #   mutate(Bigrams = reorder(Bigrams, log_ratio)) %>% -->
-<!-- #   ggplot(aes(Bigrams, log_ratio)) + -->
-<!-- #   geom_col() + -->
-<!-- #   labs(y = "Log2 ratio of beta in topic 1 / topic 3") + -->
-<!-- #   coord_flip() -->
-
-
-<!-- ``` -->
+From the display of popular terms, it can be determined that the topic one has a flavour of developemnt the 2010 World cup, development and job creation.
 
 
 ```{r}
 ###Topic 2
 
-# top_terms.2 <- speech_topics %>%
-#   filter(topic == "topic2") %>%
-#   group_by(topic) %>%
-#   top_n(50, beta) %>%
-#   ungroup() %>%
-#   arrange(topic, -beta) 
-# 
-# plot_topic_2 <- top_terms.2 %>%
-#   mutate(Bigrams = reorder(Bigrams, beta)) %>%
-#   ggplot(aes(Bigrams, beta, fill = factor(topic))) +
-#   geom_col(show.legend = FALSE) +
-#   facet_wrap(~ topic, scales = "free") +
-#   coord_flip()
-# 
-# 
-# word_count.2 <- top_terms.2 %>%
-#   filter(topic == "topic2") %>%
-#   mutate(freq = round(scale(beta*1000),0) + 1) %>%
-#   select(Bigrams, freq)
-# 
-# 
-# wordcloud.2 <- wordcloud2(word_count.2, color = "random-dark")
-# 
-# par(mfrow= c(2,1))
-# plot_topic_2
-# wordcloud.2
+#filter for topic two
+top_terms.2 <- speech_topics %>%
+  filter(topic == "topic2") %>%
+  group_by(topic) %>%
+  top_n(30, beta) %>%
+  ungroup() %>%
+  arrange(topic, -beta)
+##plot the most popluar terms
+plot_topic_2 <- top_terms.2 %>%
+  mutate(Bigrams = reorder(Bigrams, beta)) %>%
+  ggplot(aes(Bigrams, beta, fill = factor(topic))) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~ topic, scales = "free") +
+  coord_flip()
+
+#set up for word cloud
+maxs <- max((top_terms.2$beta*100))
+mins <- min(top_terms.2$beta*100)
+
+
+word_count.2 <- top_terms.2 %>%
+  mutate(freq = scale(beta*100, center = mins, scale = maxs - mins)) %>%
+  select(Bigrams, freq)
+
+
+
+#word cloud
+set.seed(12345)
+wordcloud.2 <- wordcloud2(word_count.2, color = "random-dark", size = .5)
+
+
+par(mfrow= c(2,1))
+plot_topic_2
+#set.seed(12345)
+wordcloud.2
+
+
+
+
+
+
+```
+
+
+####Topic Three
+
+Devloment
+
+From the display of popular terms, it can be determined that the topic one has a flavour of developemnt the 2010 World cup, development and job creation.
+
+
+```{r}
+###Topic 3
+
+#filter for topic three
+top_terms.3 <- speech_topics %>%
+  filter(topic == "topic3") %>%
+  group_by(topic) %>%
+  top_n(30, beta) %>%
+  ungroup() %>%
+  arrange(topic, -beta)
+##plot the most popluar terms
+plot_topic_3 <- top_terms.3 %>%
+  mutate(Bigrams = reorder(Bigrams, beta)) %>%
+  ggplot(aes(Bigrams, beta, fill = factor(topic))) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~ topic, scales = "free") +
+  coord_flip()
+
+#set up for word cloud
+maxs <- max((top_terms.3$beta*100))
+mins <- min(top_terms.3$beta*100)
+
+
+word_count.3 <- top_terms.3 %>%
+  mutate(freq = scale(beta*100, center = mins, scale = maxs - mins)) %>%
+  select(Bigrams, freq)
+
+
+
+#word cloud
+set.seed(12345)
+wordcloud.3 <- wordcloud2(word_count.3, color = "random-dark", size = .3)
+
+
+par(mfrow= c(2,1))
+plot_topic_3
+wordcloud.3
+
+
+
+```
+
+
+###Topic 4
+
+Economy
+
+``` {r}
+
+#filter for topic four
+top_terms.4 <- speech_topics %>%
+  filter(topic == "topic4") %>%
+  group_by(topic) %>%
+  top_n(30, beta) %>%
+  ungroup() %>%
+  arrange(topic, -beta)
+##plot the most popluar terms
+plot_topic_4 <- top_terms.4 %>%
+  mutate(Bigrams = reorder(Bigrams, beta)) %>%
+  ggplot(aes(Bigrams, beta, fill = factor(topic))) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~ topic, scales = "free") +
+  coord_flip()
+
+#set up for word cloud
+maxs <- max((top_terms.4$beta*100))
+mins <- min(top_terms.4$beta*100)
+
+
+word_count.4 <- top_terms.4 %>%
+  mutate(freq = scale(beta*100, center = mins, scale = maxs - mins)) %>%
+  select(Bigrams, freq)
+
+
+
+#word cloud
+set.seed(12345)
+wordcloud.4 <- wordcloud2(word_count.4, color = "random-dark", size = .3)
+
+par(mfrow = c(1,2))
+plot_topic_4
+wordcloud.4
+
+
+
+```
+
+
+
+
+
+###Topic 5
+
+Economy
+
+``` {r}
+
+#filter for topic five
+top_terms.5 <- speech_topics %>%
+  filter(topic == "topic5") %>%
+  group_by(topic) %>%
+  top_n(30, beta) %>%
+  ungroup() %>%
+  arrange(topic, -beta)
+##plot the most popluar terms
+plot_topic_5 <- top_terms.5 %>%
+  mutate(Bigrams = reorder(Bigrams, beta)) %>%
+  ggplot(aes(Bigrams, beta, fill = factor(topic))) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~ topic, scales = "free") +
+  coord_flip()
+
+#set up for word cloud
+maxs <- max((top_terms.5$beta*100))
+mins <- min(top_terms.5$beta*100)
+
+
+word_count.5 <- top_terms.5 %>%
+  mutate(freq = scale(beta*100, center = mins, scale = maxs - mins)) %>%
+  select(Bigrams, freq)
+
+
+
+#word cloud
+set.seed(12345)
+wordcloud.5 <- wordcloud2(word_count.5, color = "random-dark", size = .6)
+#saveWidget(wordcloud.5,"5.html",selfcontained = F)
+
+par(mfrow= c(2,1))
+plot_topic_5
+wordcloud.5
+
+
+
+```
+
+
+
+```{r}
+#comparison of topic 1 to topic 5
+
+small_topic <- speech_topics %>%
+  filter(topic == "topic5"|topic == "topic1")
+
+
+beta_spread <- small_topic %>%
+  #  mutate(topic = paste0("topic", topic)) %>%
+  spread(topic, beta) %>%
+  filter(topic1 > .001 | topic5 > .001) %>%
+  mutate(log_ratio = log2(topic5 / topic1))
+
+beta_spread %>%
+  group_by(direction = log_ratio > 0) %>%
+  top_n(10, abs(log_ratio)) %>%
+  ungroup() %>%
+  mutate(Bigrams = reorder(Bigrams, log_ratio)) %>%
+  ggplot(aes(Bigrams, log_ratio)) +
+  geom_col() +
+  labs(y = "Log2 ratio of beta in topic 5 / topic 1") +
+  coord_flip()
+
+
 
 ```
 
 
 ```{r}
+#comparison of topic 4 to topic 5
+
+small_topic <- speech_topics %>%
+  filter(topic == "topic5"|topic == "topic4")
+
+
+beta_spread <- small_topic %>%
+  #  mutate(topic = paste0("topic", topic)) %>%
+  spread(topic, beta) %>%
+  filter(topic4 > .001 | topic5 > .001) %>%
+  mutate(log_ratio = log2(topic5 / topic4))
+
+beta_spread %>%
+  group_by(direction = log_ratio > 0) %>%
+  top_n(10, abs(log_ratio)) %>%
+  ungroup() %>%
+  mutate(Bigrams = reorder(Bigrams, log_ratio)) %>%
+  ggplot(aes(Bigrams, log_ratio)) +
+  geom_col() +
+  labs(y = "Log2 ratio of beta in topic 5 / topic 4") +
+  coord_flip()
+
+
 
 ```
 
+
+
+```{r}
+
+#comparison of topic 2 to topic 5
+
+small_topic <- speech_topics %>%
+  filter(topic == "topic5"|topic == "topic2")
+
+
+beta_spread <- small_topic %>%
+  #  mutate(topic = paste0("topic", topic)) %>%
+  spread(topic, beta) %>%
+  filter(topic2 > .001 | topic5 > .001) %>%
+  mutate(log_ratio = log2(topic5 / topic2))
+
+beta_spread %>%
+  group_by(direction = log_ratio > 0) %>%
+  top_n(10, abs(log_ratio)) %>%
+  ungroup() %>%
+  mutate(Bigrams = reorder(Bigrams, log_ratio)) %>%
+  ggplot(aes(Bigrams, log_ratio)) +
+  geom_col() +
+  labs(y = "Log2 ratio of beta in topic 5 / topic 2") +
+  coord_flip()
+
+
+
+```
