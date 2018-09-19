@@ -8,7 +8,7 @@ require(tidyverse)
 require(tidytext)
 
 knitr::opts_chunk$set(echo = FALSE, fig.width = 12)
-source("data/data-sampling.R")
+source("../data/data-sampling.R")
 
 ```
 
@@ -82,22 +82,9 @@ grouped_data_set %>%
 
 ```
 
+# Data Split and Sampling
 
-# Data Sampling
+For all group work, we separated our full dataset into a random sampling of 80% training and 20% validation data, which was saved into a common .RData file. This ensured that there would be consistency across the data we were working on so that we could use each others work and compare results more easily.
 
-80% train, 20% validation
-
-Data is very unbalanced by president, so attempt to balance by supersampling from low sentence count presidents to ensure 
-each president has an equal number of sentences. Achieved by using sampling with replacement from 80% train data only (to ensure 
-there are no duplicates in the validation set that might skew validation error).
-
-Sam also assigned sentence id's using hashing and split the data into training and validation sets so that there would be consistency across what we were working on so that we could use each others work and compare results more easily.
-
-
-
-
-
-
-
-
-
+The graphs above make it clear that our data is also very unbalanced. In an attempt to correct for this, we applied supersampling with replacement to the training dataset to ensure an equal number of sentences per president. Training was attempted using both balanced and unbalanced training data, but it did not appear to make much difference. Balancing was conducted on the training dataset only to ensure 
+there are no duplicates in the validation set that might skew validation error.
