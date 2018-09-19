@@ -1,5 +1,5 @@
 ---
-title: "Sentiment Data Prep for NN"
+title: "Sentiment Data Prep for NN - stop words are removed"
 author: "Audrey Pentz"
 date: "September 15, 2018"
 output: html_document
@@ -20,33 +20,11 @@ knitr::opts_chunk$set(
 
 
 
-## **Read in the Data**
+## **Load the Preprocessed Data**
 
 ```{r import}
 
-txt_files <- list.files("../sona-text-1994-2018/")
-
-sona <- data.frame(filename = as.character(), speech = as.character())
-for(i in txt_files){
-  file_name <- paste0("../sona-text-1994-2018/", i)
-  
-  # import text as single character string (can also read.table but the "seperator" causes problems)
-  this_speech <- readChar(file_name, 
-                          nchars = file.info(file_name)$size)
-  
-  # make data frame with metadata (filename contains year and pres) and speech
-  this_sona <- data.frame(filename = i, speech = this_speech, stringsAsFactors = FALSE)
-  
-  # make a single dataset
-  sona <- rbind(sona, this_sona)
-}
-
-# extract year
-sona$year <- str_sub(sona$filename, start = 1, end = 4)
-
-# extract president name
-sona$president <- unlist(str_extract_all(sona$filename, '(?<=_)[^_]+(?=.txt)'))
-# this finds everything between "_" and ".txt"
+load("../input_data.RData")
 
 ```
 
@@ -57,20 +35,15 @@ sona$president <- unlist(str_extract_all(sona$filename, '(?<=_)[^_]+(?=.txt)'))
 ```{r tokenize}
 
 # sentence tokenization
-tidy_sona_sentences <- sona %>% 
-  unnest_tokens(text, speech, token = "sentences")
-# add an ID variable for sentences
-tidy_sona_sentences <- tidy_sona_sentences %>%
-  mutate(sentence_id = row_number() )
+tidy_sona_sentences <- input_data$sentences
 
 # word tokenization
-tidy_sona_words <- tidy_sona_sentences %>% 
-  unnest_tokens(word, text, token = "words") %>% 
+tidy_sona_words <- input_data$words %>% 
   filter(!word %in% stop_words$word, str_detect(word, "[a-z]"))  # remove stop words
 
 # bigram tokenization
 bigrams <- tidy_sona_sentences %>% 
-  unnest_tokens(bigram, text, token = "ngrams", n = 2)
+  unnest_tokens(bigram, sentence, token = "ngrams", n = 2)
 # separate the bigrams 
 bigrams_separated <- bigrams %>%
   separate(bigram, c("word1", "word2"), sep = " ")
@@ -81,6 +54,11 @@ bigrams_filtered <- bigrams_separated %>%
 # join up the bigrams again
 tidy_sona_bigrams <- bigrams_filtered %>%
   unite(bigram, word1, word2, sep = " ")
+
+# view data
+View(tidy_sona_sentences)
+View(tidy_sona_words)
+View(tidy_sona_bigrams)
 
 ```
 
@@ -93,7 +71,7 @@ tidy_sona_bigrams <- bigrams_filtered %>%
 # bing sentiment per sentence
 bing_sentiment <- tidy_sona_words %>%
   left_join(get_sentiments("bing")) %>%
-  group_by(filename, sentence_id) %>% 
+  group_by(president, year, election, id) %>% 
   count(sentiment) %>%
   mutate(sentiment = ifelse(is.na(sentiment), "not_in_bing_lexicon", sentiment)) %>% 
   spread(sentiment, n, fill = 0) %>%
@@ -101,7 +79,7 @@ bing_sentiment <- tidy_sona_words %>%
          total_words = positive + negative + not_in_bing_lexicon,
          bing_sentiment_perc = round((bing_sentiment/(total_words)*100),2)) %>% 
          # bing sentiment as a percentage of total words in the sentence
- select(-positive, -negative)
+  rename(bing_negative = negative, bing_positive = positive)
 
 ```
 
@@ -113,7 +91,7 @@ bing_sentiment <- tidy_sona_words %>%
 # afinn sentiment per sentence
 afinn_sentiment <- tidy_sona_words %>%
   left_join(get_sentiments("afinn")) %>%
-  group_by(filename, sentence_id) %>% 
+  group_by(president, year, election, id) %>% 
   count(score) %>% 
   mutate(score = ifelse(is.na(score), 0, score),
          total_words = sum(n),
@@ -132,10 +110,11 @@ afinn_sentiment <- tidy_sona_words %>%
 # nrc sentiment per sentence
 nrc_sentiment <- tidy_sona_words %>%
   left_join(get_sentiments("nrc")) %>%
-  group_by(filename, sentence_id) %>% 
+  group_by(president, year, election, id) %>% 
   count(sentiment) %>% 
   mutate(sentiment = ifelse(is.na(sentiment), "not_in_nrc_lexicon", sentiment)) %>% 
-  spread(key = sentiment, n, fill = 0)
+  spread(key = sentiment, n, fill = 0) %>% 
+  rename(nrc_negative = negative, nrc_positive = positive)
 
 ```
 
