@@ -8,7 +8,7 @@ load_test_and_train_data = function(df) {
   train = df[train_indices,]
   validate = df[-train_indices,]
 
-  return (list(train = train, validate = validate))
+  return (list(train = train, validate = validate, train_indices))
 }
 
 if (!exists("sentence_data")) {
