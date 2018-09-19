@@ -272,6 +272,9 @@ De Klerk repeated over 30% of his words in his 1994 pre election SONA speech. On
 
 # **Results**
 
+Bag of Words Model
+
+
 
 ## **Sentiment Analysis**
 
@@ -282,18 +285,22 @@ De Klerk repeated over 30% of his words in his 1994 pre election SONA speech. On
 ```
 ## **Bag of Words Neural Net**
 
+The count of each word that have been used in each sentence is what we are going to be feeding in. We need to unnest the sentence data, count each word in each sentence and spread the sentence word counts so that we have sentence id's in each row and we have each word as column id's. This is the simplest neural net model that we can try, so that was our first model.
+
 ```{r}
+#Unnest words and count
 president_word_count = input_data$sentences %>%
   group_by(president) %>%
   unnest_tokens(word, sentence) %>%
   count(id, word, sort = TRUE) %>%
   ungroup()
   
-
+#Spread the words
 bag_of_words <- president_word_count %>% 
   select(ID = id, prez = president,  word,n) %>% 
   spread(key = word, value = n, fill = 0)
 
+#Set training and testing sets
 set.seed(321)
 training_ids <- bag_of_words %>% 
   group_by(prez) %>% 
@@ -330,30 +337,25 @@ response_tokenizer$fit_on_texts(labels_train)
 # Extract response vector, ignoring first (empty) column
 y_train = (response_tokenizer$texts_to_matrix(labels_train, mode = "binary"))[,-1]
 
-#Create a model
-
+#Create a model, define a model by sequentially adding layers.
 model <- keras_model_sequential() #Creating an empty sequential model
-
-#Define a model by sequentially adding layers. Add a simple model so it does not overfit.
-
 model %>%
   layer_dense(units = 64, activation = 'relu', input_shape = ncol(x_train)) %>%
   layer_dense(units = 64, activation = 'relu', kernel_regularizer = regularizer_l2(0.01)) %>%
-  layer_dense(units = 6, activation = 'softmax')
-
-#See the number of parameteres:
-summary(model)
-
-#Compile and fit the model
-
-model %>% compile(
+  layer_dense(units = 6, activation = 'softmax') %>%
+  compile(
   optimizer = optimizer_rmsprop(lr = 0.003),
   loss = 'categorical_crossentropy',
   metrics = c('accuracy')
 )
+#See the number of parameteres
+summary(model)
+
+#Compile and fit the model
 model %>% fit(x_train, y_train, epochs = 10, batch_size = 32, validation_data = list(x_test, y_test)
 ) %>% plot()
 
+#Evaluate the model
 model %>% evaluate(x_test, y_test, batch_size=32, verbose = 1) #0.55886
 ```
 This model has L2 regularization to avoid overfitting but even so it didn't help very much. The accuracy is 0.55886. The optimizer_rmsprop has learning rate 0.003. This was choosen after trying lr=c(0.001, 0.002, 0.003) To make readability easier the model with best learning rate is used. 
@@ -559,8 +561,7 @@ paste0("Kappa value is ", round(k, 3), ", and this means the results have no agr
 ###Neural Nets with Sentiment Analysis Data
 ```{r}
 #The preparation of this file can be found in the same directory as the .Rdata file.
-
-load("~/Downloads/dsi-assign2/merve/sentiment_all.Rdata")
+load("~/Downloads/dsi-assign2/audrey/sentiment_all.Rdata")
 
 set.seed(123)
 
@@ -568,21 +569,21 @@ training_ids <- sentiment_all %>%
   group_by(president) %>% 
   sample_frac(0.9) %>% 
   ungroup() %>%
-  select(sentence_id)
+  select(id)
 
 training_sona <- sentiment_all %>% 
-  right_join(training_ids, by = "sentence_id") %>%
-  select(-sentence_id)
+  right_join(training_ids, by = "id") %>%
+  select(-id)
 
 test_sona <- sentiment_all %>% 
-  anti_join(training_ids, by = "sentence_id") %>%
-  select(-sentence_id)
+  anti_join(training_ids, by = "id") %>%
+  select(-id)
 
 
 # Seperate response variable
-dim(sentiment_all) #7286   31
-x_train <- as.matrix(training_sona %>% select(-president, -filename))
-x_test <- as.matrix(test_sona %>% select(-president, -filename))
+dim(sentiment_all) #8068   34
+x_train <- as.matrix(training_sona %>% select(-president, -year, -election))
+x_test <- as.matrix(test_sona %>% select(-president, -year, -election))
 
 
 #One-hot encoding for response variable
@@ -614,12 +615,14 @@ model %>%
     metrics = c('accuracy')
   )
 
-model %>% fit(x_train, y_train, epochs = 10, batch_size = 32 ) %>% plot()
+model %>% fit(x_train, y_train, epochs = 10, batch_size = 32 ,validation_data = list(x_test, y_test)) %>% plot()
 
 (accuracy_sentiment = (model %>% evaluate(x_test, y_test))$acc)
 
 paste0("Accuracy of sentiment analysis is ", round(accuracy_sentiment,3))
 ```
+Sentiment analysis also reaches it's smallest validation loss value on the second iteration. But the train accuracy and test accuracy is changing very slightly at each iteration. This model does not seem to be doing well on eighter the training set or the test set.
+
 ### Neural Nets with Topic Modelling Gamma Values
 ```{r}
 load("~/Downloads/dsi-assign2/vanessa/topic_matrix.RData")
@@ -681,13 +684,15 @@ model %>%
     metrics = c('accuracy')
   )
 
-model %>% fit(x_train, y_train, epochs = 10, batch_size = 32 ) %>% plot()
+model %>% fit(x_train, y_train, epochs = 10, batch_size = 32, validation_data = list(x_test, y_test)) %>% plot()
 
 model %>% evaluate(x_test, y_test)
+
+topic_matrix %>% left_join(sentiment_all)
 ```
 
 ###GloVe word embeddings
-We will be using GloVe embeddings. "GloVe is an unsupervised learning algorithm for obtaining vector representations for words. Training is performed on aggregated global word-word co-occurrence statistics from a corpus, and the resulting representations showcase interesting linear substructures of the word vector space." 
+We will be using GloVe embeddings. GloVe is an unsupervised learning algorithm for obtaining vector representations for words. Training is performed on aggregated global word-word co-occurrence statistics from a corpus, and the resulting representations showcase interesting linear substructures of the word vector space." 
 GloVe stands for "Global Vectors for Word Representation". It's a popular embedding technique.
 [Reference:Jeffrey Pennington, Richard Socher, and Christopher D. Manning. 2014. GloVe: Global Vectors for Word Representation:https://nlp.stanford.edu/pubs/glove.pdf ]
 Specifically, we will use the 100-dimensional GloVe embeddings of 400k words computed on a 2014 dump of English Wikipedia. 
