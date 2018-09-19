@@ -102,7 +102,7 @@ avg_sentence_count %>%
 
 ##### **Insights:**   
 
-On average, Mandeka, Mbeki and Zuma, the 3 longest reigning presidents, used a similar number of sentences per SONA speech at between 300 and 313. De Klerk used the least number of sentences at 103 and Motlanthe the most at 346, nearly 3.5 times as many as De Klerk.
+On average, Mandela, Mbeki and Zuma, the 3 longest reigning presidents, used a similar number of sentences per SONA speech at between 300 and 313. De Klerk used the least number of sentences at 103 and Motlanthe the most at 346, nearly 3.5 times as many as De Klerk.
 
 
 
@@ -121,11 +121,11 @@ sentence_count %>%
   ggplot(aes(x = as.numeric(year), y = num_sentences, colour = president)) +
   geom_point() + 
   geom_smooth(method = "loess", aes(colour = president)) +
-  geom_vline(xintercept = 1994, color = "grey") +
-  geom_vline(xintercept = 1999, color = "grey") +
-  geom_vline(xintercept = 2004, color = "grey") +
-  geom_vline(xintercept = 2009, color = "grey") +
-  geom_vline(xintercept = 2014, color = "grey")
+  ggtitle("Number of Sentences per SONA") +
+  xlab("year") +
+  scale_x_discrete(name ="year", 
+                    limits=c(1994,1999,2004,2009,2014)) +
+  scale_y_continuous(limits = c(0,500))
 
 ```
 
@@ -188,11 +188,10 @@ word_count %>%
   ggplot(aes(x = as.numeric(year), y = num_words, colour = president)) +
   geom_point() + 
   geom_smooth(method = "loess", aes(colour = president)) +
-  geom_vline(xintercept = 1994, color = "grey") +
-  geom_vline(xintercept = 1999, color = "grey") +
-  geom_vline(xintercept = 2004, color = "grey") +
-  geom_vline(xintercept = 2009, color = "grey") +
-  geom_vline(xintercept = 2014, color = "grey")
+  ggtitle("Number of Words per SONA") +
+  xlab("year") +
+  scale_x_discrete(name ="year", 
+                    limits=c(1994,1999,2004,2009,2014))
 
 ```
   
@@ -211,7 +210,7 @@ word_count <- tidy_sona_words %>%
   filter(!(word %in% c("government", "south", "africa", "african"))) %>%    # remove obvious words dominating word cloud
   count(word, sort = TRUE)
 
-wordcloud2(word_count[1:300, ], size = .5, color='random-dark')
+wordcloud2(word_count[1:300, ], size = .4, color='random-dark')
 
 ```
   
@@ -230,7 +229,9 @@ bigram_count <- tidy_sona_bigrams %>%
   filter(!(bigram %in% c("south africa", "south africans", "south african", "local government"))) %>%    # remove obvious words dominating word cloud
   count(bigram, sort = TRUE)
 
-wordcloud2(bigram_count[1:300, ], size = .35, color='random-dark')
+# wordcloud2(bigram_count[1:200, ], size = .3, color='random-dark')
+
+knitr::include_graphics("C:/Users/nb174984/Desktop/Masters Data Science/Data Science for Industry/dsi-assign2/WordCloud.png")
 
 ```
   
@@ -255,24 +256,18 @@ diversity_per_year <- input_data$words %>%   # don't remove stop words this time
 diversity_per_year %>%
   ggplot(aes(x = as.numeric(year), y = diversity, colour = president)) +
   geom_point(color = "steelblue",
-               alpha = .7,               # transparency
-               size = 3,                 # point size
-               position = "jitter") +    # point overlap
+               alpha = .7,                 # transparency
+               size = 3) +                 # point size
   geom_smooth(method = "loess", aes(colour = president)) +
   ggtitle("Lexical Diversity per President") +
-  xlab("year") +
-  ylab("") +
-  geom_vline(xintercept = 1994, color = "grey") +
-  geom_vline(xintercept = 1999, color = "grey") +
-  geom_vline(xintercept = 2004, color = "grey") +
-  geom_vline(xintercept = 2009, color = "grey") +
-  geom_vline(xintercept = 2014, color = "grey")
+  scale_x_discrete(name ="year", 
+                    limits=c(1994,1999,2004,2009,2014))
 
 ```
   
 ##### **Insights:**   
 
-The number of unique words per SONA ranges from about 780 with de Klerk in 1994 to over 2500 with Mandela in his post election speech of 1999. Mbeki's post election speech of 2004 and Zuma's post election speech of 2014 got to about 2250.  
+The number of unique words per SONA ranges from about 780 with de Klerk in 1994 to over 2500 with Mandela in his post election speech of 1999. Mbeki's post election speech of 2004 and Zuma's post election speech of 2014 got to about 2250, also higher than their averages. 
 
 It's interesting that whilst the trend in the number of unique words used was most often upwards with Mandela, Mbeki and Zuma both show a mostly upward trend in the lead up to the election year, followed by a mostly downward trend after reaching the 2250 unique words mark in their post election speech.  
 
@@ -295,24 +290,18 @@ density_per_year <- input_data$words %>%   # don't remove stop words this time
 density_per_year %>%
   ggplot(aes(x = as.numeric(year), y = density, colour = president)) +
   geom_point(color = "steelblue",
-               alpha = .7,               # transparency
-               size = 3,                 # point size
-               position = "jitter") +    # point overlap
+               alpha = .7,                 # transparency
+               size = 3) +                 # point size
   geom_smooth(method = "loess", aes(colour = president)) +
   ggtitle("Lexical Density per President") +
-  xlab("year") +
-  ylab("") +
-  geom_vline(xintercept = 1994, color = "grey") +
-  geom_vline(xintercept = 1999, color = "grey") +
-  geom_vline(xintercept = 2004, color = "grey") +
-  geom_vline(xintercept = 2009, color = "grey") +
-  geom_vline(xintercept = 2014, color = "grey")
+  scale_x_discrete(name ="year", 
+                    limits=c(1994,1999,2004,2009,2014))
 
 ```
   
 ##### **Insights:**   
 
-De Klerk repeated over 30% of his words in his 1994 pre election SONA speech. On average, Mandela repeated about 25% of words in each of his SONA speeches and this reduced to about 20% in the post election speech of 1999. Mbeki's repitition rate was about 23% and this reduced to 20% in the post election speech of 2004. Zuma's repitition rate is over 30% with the exception of his post election speech of 2014 at about 23%.  
+De Klerk repeated over 30% of his words in his 1994 pre election SONA speech. On average, Mandela repeated about 25% of words in each of his SONA speeches and this reduced to about 20% in the post election speech of 1999. Mbeki's repitition rate was about 23% and this reduced to about 20% in the post election speech of 2004. Zuma's repitition rate is over 30% with the exception of his post election speech of 2014 at about 23%.  
 
 
 
