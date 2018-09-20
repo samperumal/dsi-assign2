@@ -36,6 +36,9 @@ knitr::opts_chunk$set(
 
 load("~/Downloads/dsi-assign2/input_data.RData")
 load("~/Downloads/dsi-assign2/sentence_data.RData")
+load("~/Downloads/dsi-assign2/balanced_train_data.RData")
+load("~/Downloads/dsi-assign2/audrey/sentiment_all.Rdata")
+load("~/Downloads/dsi-assign2/vanessa/topic_matrix.RData")
 ```
 
 
@@ -680,7 +683,7 @@ paste0("Kappa value is ", round(k, 3), ", and this means the results have no agr
 ```
 Sentiment analysis also reaches it's smallest validation loss value on the fifth iteration. But the train accuracy and test accuracy is changing very slightly at each iteration. This model does not seem to be doing well on eighter the training set or the test set. The test accuracy is 0.4361834 and the training accuracy is 0.4353395. If we look at the NRC sentiment lexicon it is visible that all presidents share same sentiment distribution pattern, so this is why it is not overfitting. Because our set aside test set is actually no different than the training set.
 
-### Neural Nets with Topic Modelling Data (Gamma Values)
+###**Neural Nets with Topic Modelling Data (Gamma Values)**
 ```{r}
 #The preparation of this topic_matrix can be found in the 
 load("~/Downloads/dsi-assign2/vanessa/topic_matrix.RData")
@@ -789,7 +792,7 @@ paste0("Kappa value is ", round(k, 3), ", and this means the results have no agr
 The train and the test set are not very distinct from each other just like sentiment analysis. 
 If we look at the mixture of the topics by each president in topic modelling chunk we can see that all the topics for each president are kind of uniformed and hard to seperate each president's topic from one another.
 
-###CNN with max-pooling Using Transfer Learning (Pre-trained Embeddings)
+###**CNN with max-pooling Using Transfer Learning (Pre-trained Embeddings)**
 
 We will be using GloVe embeddings. GloVe stands for "Global Vectors for Word Representation" and is an unsupervised learning algorithm for obtaining vector representations for words as it is stated in their website. Training is performed on aggregated global word-word co-occurrence statistics from a corpus, and the resulting representations showcase interesting linear substructures of the word vector space.
 [Reference:Jeffrey Pennington, Richard Socher, and Christopher D. Manning. 2014. GloVe: Global Vectors for Word Representation:https://nlp.stanford.edu/pubs/glove.pdf ]
@@ -953,6 +956,9 @@ model %>% fit(
   validation_data = list(x_val, y_val)
 ) %>% plot()
 
+(test_accuracy_transferlearn = model %>% evaluate(x_val, y_val))
+(train_accuracy_transferlearn = model %>% evaluate(x_train, y_train))
+
 #Getting the predictions:
 predictions <- model %>% predict(x_val)
 
@@ -997,7 +1003,7 @@ Mojority of the sentences of deKlerk is predicted as Mandela(14/17).
 
 ```{r nn}
 
-# sam / merve??
+# sam / merve?? I have actually done my predictions within chunks, so we can remove this part. Votes?
 
 ```
 
@@ -1011,7 +1017,7 @@ Mojority of the sentences of deKlerk is predicted as Mandela(14/17).
 
 ```{r cnn}
 
-# ??
+# ?? Also done this part inside the chunks, thought it was easier to see that way.
 
 ```
 
@@ -1033,10 +1039,11 @@ Mojority of the sentences of deKlerk is predicted as Mandela(14/17).
 
 #### **Evaluate Out of Sample Performance**
 
-
+here we can combine all the train and test accuracies in a table, as a conclusion.
 
 ## **Analysis of Results and Conclusion**
 
+Also done the critisism after each chunk. 
 
 
 ## **References**
@@ -1045,5 +1052,11 @@ https://www.kaggle.com/rtatman/tutorial-sentiment-analysis-in-r
 
 https://www.datacamp.com/community/tutorials/sentiment-analysis-R
 
+https://nlp.stanford.edu/pubs/glove.pdf 
 
+https://blog.keras.io/using-pre-trained-word-embeddings-in-a-keras-model.html
+
+https://keras.rstudio.com/articles/examples/pretrained_word_embeddings.html
+
+https://github.com/rstudio/keras/blob/master/vignettes/examples/pretrained_word_embeddings.R
 
