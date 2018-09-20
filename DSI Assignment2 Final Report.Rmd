@@ -210,7 +210,7 @@ wordcloud2(bigram_count[1:300, ], size = .8, color='random-dark')
 
 
 
-### **Lexical Diversity per President**  
+#### **Lexical Diversity per President**  
 
 Lexical diversity refers to the number of unique words used in each SONA.
 
@@ -235,7 +235,7 @@ diversity_per_year %>%
 
 ```
   
-##### **Insights:**   
+## **Insights:**   
 
 The number of unique words per SONA ranges from about 700 with de Klerk in 1994 to over 2500 with Mandela in his post election speech of 1999. Mbeki's post election speech of 2004 and Zuma's post election speech of 2014 also got close to the 2500 mark.  
 
@@ -245,7 +245,7 @@ If we exclude the post election speeches, the number of unique words used by Mbe
 
 
 
-### **Lexical Density per President**  
+#### **Lexical Density per President**  
 
 Lexical density refers to the number of unique words used in each SONA divided by the total number of words and a high value is an indicator of word repitition.  
 
@@ -270,7 +270,7 @@ density_per_year %>%
 
 ```
   
-##### **Insights:**   
+## **Insights:**   
 
 De Klerk repeated over 30% of his words in his 1994 pre election SONA speech. On average, Mandela repeated about 25% of words in each of his SONA speeches and this reduced to about 20% in the post election speech of 1999. Mbeki's repitition rate was about 23% and this reduced to 20% in the post election speech of 2004. Zuma's repitition rate is over 30% with the exception of his post election speech of 2014 at about 23%.  
 
@@ -278,20 +278,26 @@ De Klerk repeated over 30% of his words in his 1994 pre election SONA speech. On
 
 # **Results**
 
-Bag of Words Model
 
 
 
-## **Sentiment Analysis**
+#### **Sentiment Analysis**
 
 ```{r sentiment}
 
 # audrey
 
 ```
+## **Topic Modelling**
+
+```{r topic}
+
+# vanessa
+
+```
 #### **Neural Nets **
 
-## **Bag of Words Neural Net**
+### **Neural Net with Bag of Words Data**
 
 The count of each word that have been used in each sentence is what we are going to be feeding in. We need to unnest the sentence data, count each word in each sentence and spread the sentence word counts so that we have sentence id's in each row and we have each word as column id's. This is the simplest neural net model that we can try, so that was our first model.
 
@@ -444,7 +450,7 @@ Just for the word-count model seems good enough. But this model does not conside
 
 After the fourth iteration validation loss starts increasing which is a sign of overfitting. 
 
-## **NN using tf-idf**
+## **Neural Net with tf-idf Data**
 
 TFIDF is a statisic that shows how important a word is to it's corpus. So if we are feeding NN with TFIDF we are logically expecting the results to be slightly better than the word-cout NN model. 
 
@@ -568,7 +574,7 @@ paste0("Kappa value is ", round(k, 3), ", and this means the results have no agr
 ```
 The accuracy is 0.6158 and the model starts overfitting after fourth epoch. So this is slightly better than the bag of words word-count model as we expected.
 
-###Neural Nets with Sentiment Analysis Data
+###**Neural Net with Sentiment Analysis Data**
 ```{r nnwith}
 #The preparation of this file can be found in the same directory as the .Rdata file.
 load("~/Downloads/dsi-assign2/audrey/sentiment_all.Rdata")
@@ -674,8 +680,9 @@ paste0("Kappa value is ", round(k, 3), ", and this means the results have no agr
 ```
 Sentiment analysis also reaches it's smallest validation loss value on the fifth iteration. But the train accuracy and test accuracy is changing very slightly at each iteration. This model does not seem to be doing well on eighter the training set or the test set. The test accuracy is 0.4361834 and the training accuracy is 0.4353395. If we look at the NRC sentiment lexicon it is visible that all presidents share same sentiment distribution pattern, so this is why it is not overfitting. Because our set aside test set is actually no different than the training set.
 
-### Neural Nets with Topic Modelling Gamma Values
+### Neural Nets with Topic Modelling Data (Gamma Values)
 ```{r}
+#The preparation of this topic_matrix can be found in the 
 load("~/Downloads/dsi-assign2/vanessa/topic_matrix.RData")
 
 sona_gamma = topic_matrix
@@ -782,7 +789,7 @@ paste0("Kappa value is ", round(k, 3), ", and this means the results have no agr
 The train and the test set are not very distinct from each other just like sentiment analysis. 
 If we look at the mixture of the topics by each president in topic modelling chunk we can see that all the topics for each president are kind of uniformed and hard to seperate each president's topic from one another.
 
-###Transfer learning using pre-trained embeddings
+###CNN with max-pooling Using Transfer Learning (Pre-trained Embeddings)
 
 We will be using GloVe embeddings. GloVe stands for "Global Vectors for Word Representation" and is an unsupervised learning algorithm for obtaining vector representations for words as it is stated in their website. Training is performed on aggregated global word-word co-occurrence statistics from a corpus, and the resulting representations showcase interesting linear substructures of the word vector space.
 [Reference:Jeffrey Pennington, Richard Socher, and Christopher D. Manning. 2014. GloVe: Global Vectors for Word Representation:https://nlp.stanford.edu/pubs/glove.pdf ]
@@ -981,13 +988,7 @@ Majority of the sentences of Mothlane(38/66) is predicted as Mandela,
 Majority of sentences of Ramaphosa is predicted as Mandela(19/47) or Zuma(15/47),
 Mojority of the sentences of deKlerk is predicted as Mandela(14/17).
 
-## **Topic Modelling**
 
-```{r topic}
-
-# vanessa
-
-```
 
 
 
