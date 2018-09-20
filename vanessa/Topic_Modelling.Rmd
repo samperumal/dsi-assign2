@@ -6,7 +6,7 @@ output:
 always_allow_html: yes
 ---
 
-```{r global_options, include=FALSE}
+```{r global_options, include=FALSE, warning=FALSE}
 knitr::opts_chunk$set(fig.width=8, fig.height=5, fig.path='Figs/',
                       echo=TRUE, warning=FALSE, message=FALSE, fig.align = "center" )
 ```
@@ -21,8 +21,7 @@ library(tidytext)
 library(topicmodels)
 library(ldatuning)
 library(wordcloud2)
-
-
+library(nnet)
 
 ```
 
@@ -49,10 +48,13 @@ The following methodology was followed:
 4. Text mining methods were deployed to extract insight into the different topics
 5. The probability of sentences to each topics were then passed through to a neural network.
 
+
+
+
 ####Step One: Tokenisation, Remove Stop words and Document Term Matrix
 
 
-```{r, echo = TRUE}
+```{r, warning = FALSE}
 
 #Load data
 load("../input_data.RData")
@@ -98,10 +100,10 @@ ggplot(aes(bigram, count_bigram)) +
 
 ```
 
-After tokenisation and removal of stop words, the top 20 most used terms across all of the SONA speeches are displayed.  Unsurprisingly, "South Africa" is the most used term followed closely by "South African" and "South Africans".  These terms do not add to our understanding of the topics and tend to confuse the topic modelling going forward.  The removal of the terms allows for a cleaner interpretation.  "Public service and "Local Government" are then the most used terms.
+After tokenisation and removal of stop words, the top 20 most used terms across all of the SONA speeches are displayed.  Unsurprisingly, "South Africa" is the most used term followed closely by "South African" and "South Africans" and "Local Government".  These terms do not add to our understanding of the topics and tend to confuse the topic modelling going forward.  The removal of the terms allows for a cleaner interpretation.  "Public service is then the most used term.
 
 
-```{r}
+```{r, warning=FALSE}
 
 #create term count to feed into DTM
 bigrams_count <- bigrams_united %>%
@@ -130,7 +132,7 @@ cast_dtm(id, bigram, count_bigram)
 
 ###Step 2: Optimisation of k - the number of topics.
 
-A pre-requisite of topic modelling is knowing the number of topics that each corpus may contain (i.e. the latent factor k) In some cases, this may be a fair assumption but without reading though each speech, how  could one know how many different topics have been articulated in the SONA's?  Luckily, Murzintcev Nikita has published an R- package (ldatuning) that helps to optimise the number of topics (k) over three different measures. The measures used to determine the number of topics, are discussed in an RPubs paper which can found here: http://www.rpubs.com/MNidhi/NumberoftopicsLDA and the following optimisation largely follows the accompanying vignette: https://cran.r-project.org/web/packages/ldatuning/vignettes/topics.html
+A pre-requisite of topic modelling is knowing the number of topics that each corpus may contain (i.e. the latent factor k) In some cases, this may be a fair assumption but without reading though each speech, how  could one know how many different topics have been articulated in the SONA's?  Luckily, Murzintcev Nikita has published an R- package (ldatuning) that helps to optimise the number of topics (k) over three different measures. The measures used to determine the number of topics, are discussed in an RPubs paper which can found here: [link](http://www.rpubs.com/MNidhi/NumberoftopicsLDA) and the following optimisation largely follows the accompanying vignette: [link] (https://cran.r-project.org/web/packages/ldatuning/vignettes/topics.html)
 
 The following extract from the RPub paper gives a brief explanation of the methods used to optimise for k:
 
@@ -147,7 +149,7 @@ In addition to this, Nikita considers how the number of k may change over a vali
 
 Below is an attempt to optimise for k and to check that the choice of k holds over an unseen data set.
 
-```{r, }
+```{r, warning=FALSE}
 #sepertate the bigrams into a train and test set
 #ungroup the daat
 bigrams_sample <- bigrams_count %>% ungroup()
@@ -185,7 +187,7 @@ FindTopicsNumber_plot(result)
 
 From the above plot, the marginal benefit from adding another topic, stops at around 8-10 topics.  In order to test this, the *"perplexity"* over a test sample for the document term matrix can be checked.
 
-```{r}
+```{r, warning=FALSE}
 #initalise loop
 perplexity_df <- data.frame(train=numeric(), test=numeric())
 #set patamaets
@@ -218,6 +220,9 @@ As more topics are used, the perplexity of the training sample does decrease but
 
 The evidence from these two plots suggest that the optimal number topics sits at around 8 topics.  
 
+
+
+
 ###Step 3: Latent Dirichlet allocation 
 
 
@@ -228,7 +233,7 @@ For this assignment, Latent Dirichlet allocation (LDA) was used for the topic mo
       
       
       
-```{r}
+```{r, warning=FALSE}
 
 ##chose 5 topics
 #set seed
@@ -261,19 +266,30 @@ speech_topics <- speech_topics %>%
 
 
 ```
+
+
       
-The beta matrix produced gives the probablity of the topic prodcusing that bigram (i.e. that the phrase is in reference to that topic.)  From this measure, one can get a sense of what the topic is about. By using the most popular phrases in each topic, understanding of the flavour of each topic.  However, it must be kept in mind that terms can belong to *more than one topic* so applying some logic to get a theme or flavour should e applied liberally.
+### Step 4: Extracting insights  
 
-####Topic One
 
-From the display of popular terms, it can be determined that the topic one has a vaugue connection to "job creation" - this is the most common terms but is supported by other terms that have a high proabbility of being generated by this topic such as: 
-+ world cup
-+ national youth
-+ infratsrticutere develpoment
+      
+      
+####Understanding the topics via the bigrams      
+      
+The beta matrix produced gives the probability of the topic producing that bigram (i.e. that the phrase is in reference to that topic.)  From this measure, one can get a sense of what the character of the topic is. By using the most popular phrases in each topic, understanding of the flavour of each topic emerges.  However, it must be kept in mind that terms can belong to *more than one topic* so applying some logic to get a theme or flavour should be done liberally.
 
-These concepts all support the idea of the job creation as each of these will generate jobs for the country. But there is some noise in the topic for "adress terms" i.e. houurable pseaker or hounrable chairperson.  "Nelson Mandela" and "Presdient Mandela" crop up too which suggests that along side the job creation theme, there exists some of what can be termed "terms of endearmnt" 
 
-```{r}
+
+#####Topic One
+
+From the display of popular terms, it can be determined that the topic one has a vague connection to "job creation" - this is the most common terms but is supported by other terms that have a high probability of being generated by this topic such as: 
++ "world cup"
++ "national youth"
++ "infrastructure development"
+
+These concepts all support the idea of the job creation as each of these will generate jobs for the country. But there is some noise in the topic for "address terms" i.e. honourable speaker or honourable chairperson.  "Nelson Mandela" and "President Mandela" crop up too which suggests that alongside the job creation theme, there exists some of what can be termed "terms of endearment" 
+
+```{r, warning=FALSE}
 ###Topic 1
 
 #filter for topic one
@@ -315,19 +331,20 @@ wordcloud.1
 ```
 
 
-####Topic Two
+
+#####Topic Two
 
 
-As with the previous topic, there is some random "terms of endearment" in this topic as well (i.e. madame speaker) but it is not as evident as in the first topic.  The next four terms sums out the main themes for this topic:
-+ Economic Empowerment
-+ Black Economic
-+ Justce System
-+ Criminal Jutice
+As with the previous topic, there is some random "terms of endearment" in this topic as well (i.e. "madam speaker") but it is not as evident as in the first topic. This is to be expected as bigrams can be generated by more than one topic as each topic is a mixture of bigrams!  The next four terms sums out the main themes for this topic:
++ "Economic Empowerment"
++ "Black Economic"
++ "Justice System"
++ "Criminal Justice"
 
-In summary, this topic can be summed as "Economy/ Criminal and Justice system"
+In summary, this topic can be summed as "Economy/ Criminal and Justice System"
 
 
-```{r}
+```{r, warning=FALSE}
 ###Topic 2
 
 #filter for topic two
@@ -374,12 +391,12 @@ wordcloud.2
 ```
 
 
-####Topic Three
+#####Topic Three
 
 
-Despite the most popular terms being "United Nation" and "private sector", there a theme that is "develpoing". As in develpoment plan, resource development, national development and development programme etc.  And thus, the topic is named.
+Despite the most popular terms being "United Nation" and "private sector", there a theme that is "developing". As in development plan, resource development, national development and development programme etc.  And thus, the topic is named.      
 
-```{r}
+```{r, warning = FALSE}
 ###Topic 3
 
 #filter for topic three
@@ -422,13 +439,13 @@ wordcloud.3
 ```
 
 
-###Topic 4
+#####Topic 4
 
-Once again, there is a "term of endeament" in the popular terms ("fellow south" which is assumed short for "fellow South African's" which is one of former President Zuma's favourite phrases).  With all the other terms combined, a theme of "Social Reform and Regional/Munciple Goverment" takes shape.
+Once again, there is a "term of endearment" in the popular terms ("fellow south" which is assumed short for "fellow South African's" which is one of former President Zuma's favourite phrases).  With all the other terms combined, a theme of "Social Reform/ Regional and Municipal Government" takes shape.
 
 Given that there is a possible trigram evident here, it may be worth exploring in future work.
 
-``` {r}
+``` {r , warning =  FALSE}
 
 #filter for topic four
 top_terms.4 <- speech_topics %>%
@@ -470,13 +487,13 @@ wordcloud.4
 
 
 
-###Topic 5
+#####Topic 5
 
-"Public Sector", "local goverment" and "private sector" are popular terms in topic 5.  After consideratio of the various other terms, of which some have cross over with other topics and dicussion, the eventual name for this topic becaome "Public Sector Entities"
+"Public sector" and "private sector" are popular terms in topic 5.  After consideration of the various other terms, of which some have cross over with other topics and discussion, the eventual name for this topic became "Public Sector Entities"
 
 
 
-``` {r}
+``` {r, warning = FALSE}
 
 #filter for topic five
 top_terms.5 <- speech_topics %>%
@@ -517,10 +534,9 @@ wordcloud.5
 
 ```
 
-A differetn way of looking at this topic could be to investigate the biggest differenatil in terms between topics.  For instance, using the log(base 2) ratio between topic 1 and topic 5, show the terms that have the widest margin between the two topic (i.e. are far more likely to be in topic 5 versus topic 1)
+A different way of looking at this topic could be to investigate the biggest differential in terms between topics.  For instance, using the log(base 2) ratio between topic 1 and topic 5, shows the terms that have the widest margin between the two topic (i.e. are far more likely to be in topic 5 versus topic 1)
 
-
-```{r}
+```{r, warning =  FALSE}
 #comparison of topic 1 to topic 5
 
 small_topic <- speech_topics %>%
@@ -548,37 +564,92 @@ beta_spread %>%
 ```
 
 
-For instance, "social programmes", "human fufliment" , "rights comminsion" are all genetated in signifigantly larger proportions by Topic 5 compared to Topic 1 while "natonal social", "training collegues" and "sector unions" all exist with in Topic 1.
+For instance, "social programmes", "human fulfilment", "rights commission" are all generated in significantly larger proportions by Topic 5 compared to Topic 1 while "national social", "training colleagues" and "sector unions" all exist with in Topic 1.
 
-Given the naming of Topic 5 as "Pblic Sector entities" and Topic 1 as "Job creation and terms of endearment" these terms do seem to be grouped in line with expectation.
-
-
+Given the naming of Topic 5 as "Public Sector Entities" and Topic 1 as "Job Creation/Terms of Endearment" these terms do seem to be grouped in line with expectation.
 
 
 
 
-```{r}
-#comparison of topic 4 to topic 5
+####Understanding the mixture of topics within the sentence    
 
-small_topic <- speech_topics %>%
-  filter(topic == "topic5"|topic == "topic4")
+The LDA model allows each of the sentence to be represented as a mixture of topics.  The gamma matrix shows the document-topic probability for each sentence. i.e. the probability that each sentence is drawn from that topic. For instance, the follow sentence sampled from random shows that it has a 0.905% probability of being drawn from topic 4 based on the use of the bigrams within it.  The sentence appears to be talking about the water and the infrastructure around it.  The label for topic of was "Social Reform/ Regional and Municipal Government" and this statement seems to be somewhat relevant to it.
 
 
-beta_spread <- small_topic %>%
-  #  mutate(topic = paste0("topic", topic)) %>%
-  spread(topic, beta) %>%
-  filter(topic4 > .001 | topic5 > .001) %>%
-  mutate(log_ratio = log2(topic5 / topic4))
+```{r, warning = FALSE}
+#get the gamma matrix and change to double and rename
+speech_documents <- cbind(as.character(topics_lda@documents), tidy(topics_lda@gamma), stringsAsFactors = FALSE)
+colnames(speech_documents) <- c("id","X1","X2","X3","X4","X5")
+speech_documents$X1 <- as.double(speech_documents$X1)
+speech_documents$X1 <- as.double(speech_documents$X2)
+speech_documents$X1 <- as.double(speech_documents$X3)
+speech_documents$X1 <- as.double(speech_documents$X4)
+speech_documents$X1 <- as.double(speech_documents$X5)
 
-beta_spread %>%
-  group_by(direction = log_ratio > 0) %>%
-  top_n(10, abs(log_ratio)) %>%
-  ungroup() %>%
-  mutate(Bigrams = reorder(Bigrams, log_ratio)) %>%
-  ggplot(aes(Bigrams, log_ratio)) +
-  geom_col() +
-  labs(y = "Log2 ratio of beta in topic 5 / topic 4") +
-  coord_flip()
+#eft join to orginal data
+#left join as stop words makes less items
+topic_matrix <- left_join(inputdata,  speech_documents, by = "id")
+
+##make the NA )'s for Merv's purposes
+topic_matrix <- topic_matrix %>%
+  mutate(X1 = ifelse(is.na(X1), 0, X1)) %>%
+  mutate(X2 = ifelse(is.na(X1), 0, X2)) %>%
+  mutate(X3 = ifelse(is.na(X1), 0, X3)) %>%
+  mutate(X4 = ifelse(is.na(X1), 0, X4)) %>%
+  mutate(X5 = ifelse(is.na(X1), 0, X5)) 
+  
+
+#save this for Merve
+#save(topic_matrix, file = "vanessa/topic_matrix.RData")
+
+#random sample of sentence
+set.seed(12345)
+sample <- as.tibble(sample_n(topic_matrix, size = 1)) %>% select (- election, -id)
+kable(sample, caption = "Sample sentence showing topic probabilities")
+
+```
+
+Using this method, the sentences can be roughly classified to a topic based on the probabilities (i.e. classify the sentence by the topic with the highest probability) and further analysis can be conducted. 
+
+(Note: the which.is.max breaks ties at random so where a sentence has equal probabilities, is will decide at random to which topic it gets assigned)
+
+
+```{r, warning = FALSE}
+##find the topic per sentence
+data.max <- as.data.frame(topic_matrix[,6:10])
+data.max <- apply(topic_matrix[,6:10],1,which.is.max) 
+data.max[sapply(data.max, is.null)] <- NA
+data.max <- unlist(as.numeric(as.character(data.max)))
+
+#bind the max topic
+topic_matrix <- cbind(topic_matrix, data.max)
+#View(head(topic_matrix))
+
+##gather data
+topic_matrix_long <- topic_matrix %>%
+  select(id, president, sentence, X1,X2,X3,X4,X5, data.max) %>%
+  gather(X1, X2,X3,X4,X5, key = "topic", value = "gamma")
+
+#pivot for graph
+totals <- topic_matrix_long %>% count(president)
+
+
+data.graph <- topic_matrix_long %>%
+  group_by(president, data.max) %>%
+  summarise(count_topic = n())
+
+data.graph <- left_join(data.graph, totals, by = "president") %>% mutate(pre.topic.perc = count_topic/n)
+
+#graph
+  data.graph %>%
+    mutate(term = reorder(president, pre.topic.perc * data.max)) %>%
+    ggplot(aes(y= pre.topic.perc, x= data.max,  fill = factor(data.max))) +
+    geom_col(show.legend = FALSE) +
+    scale_x_discrete(name ="Topics", 
+                     limits=c("1","2","3","4","5")) +
+    facet_wrap(~ president, scales = "free") 
+  
+
 
 
 
@@ -586,30 +657,61 @@ beta_spread %>%
 
 
 
+Consider the mixture of topics that each individual president covers during the SONA address.  Despite the imbalance in the number of sentences said by each president, there seems to be a fairly standard shape to the topics discussed. The two exceptions to this are de Klerk and Zuma. All other presidents tend to send around 10-15% on topic 1 ("Job Creation/Terms of Endearment") and the 15-20% on Topic 2 ("Economy/Criminal and Justice System"), Topic 3 ("Development") and Topic 4 ("Social Reform/Regional and Municipal Government") and the around another 10% on Topic 5 ("Public Sector Entities").  This trend means that it may be difficult for a supervised model to pick up difference in presidents based on the topic covered.  
+
+As stated, the only two presidents where this trend differs are President de Klerk and President Zuma.  President de Klerk spend the majority of his time on Topic 1 ("Job Creation/Terms of Endearment") followed by Topic 2 ("Economy/Criminal and Justice System").  Given the context around the time period, it may be unsurprising that "terms of endearment" and "criminal and Justice systems" come up since his speech would be littered with names of people and political parties as well as talking about past injustices.
+
+President Zuma spends the majority of his speeches on Topic 4 ("Social Reform/Regional and Municipal Government").  Once again, given context that his terms as President was marked with service delivery strikes, two major droughts over a few different regions and  discussions around and reform this may be unsurprisingly.  And in fact, when the most popular terms from topic 4 is recalled ("fellow south") is may even be predictable that this would be the most "talked about" topic for President Zuma.  What is interesting that given the attention to the issues of State Capture that characterised Zuma's presidency, his coverage of Topic 5 ("Public Sector Enterprises") is much smaller than that of his peers.
+
+
+A similar analysis can be taken over time.
+
+
 ```{r}
 
-#comparison of topic 2 to topic 5
-
-small_topic <- speech_topics %>%
-  filter(topic == "topic5"|topic == "topic2")
-
-
-beta_spread <- small_topic %>%
-  #  mutate(topic = paste0("topic", topic)) %>%
-  spread(topic, beta) %>%
-  filter(topic2 > .001 | topic5 > .001) %>%
-  mutate(log_ratio = log2(topic5 / topic2))
-
-beta_spread %>%
-  group_by(direction = log_ratio > 0) %>%
-  top_n(10, abs(log_ratio)) %>%
-  ungroup() %>%
-  mutate(Bigrams = reorder(Bigrams, log_ratio)) %>%
-  ggplot(aes(Bigrams, log_ratio)) +
-  geom_col() +
-  labs(y = "Log2 ratio of beta in topic 5 / topic 2") +
-  coord_flip()
+##gather data
+topic_matrix_year <- topic_matrix %>%
+  select(id, year, sentence, X1,X2,X3,X4,X5, data.max) %>%
+  gather(X1, X2,X3,X4,X5, key = "topic", value = "gamma")
 
 
+#pivot for graph
+totals.year <- topic_matrix_year %>% count(year)
+
+data.graph.year <- topic_matrix_year %>%
+  group_by(year, data.max) %>%
+  summarise(count_topic = n())
+
+data.graph <- left_join(data.graph.year, totals.year, by = "year") %>% 
+  mutate(year.topic.perc = count_topic/n) %>%
+  select (year, data.max, year.topic.perc)
+
+#graph
+data.graph %>%
+    filter(data.max != "NA") %>%
+    mutate(topic = data.max) %>%
+    ggplot(aes(y= year.topic.perc, x= year,  colour = factor(topic))) + 
+    geom_line() + geom_point() +
+  scale_x_continuous(name="Year", limits=c(1994, 2018), breaks = c(1994,1998,2002,2006,2010,2014, 2018))
 
 ```
+
+The graph shows that over time, topics 1 and 5 are the least discussed topics while topics 2,3 and 4 all get much the same airtime. There are a number of notable spikes/valleys:
++ In 1996, Topic 2 ("Economy/Crime and Justice System") spikes
+  
+  The 1996 SONA was a few months ahead of the introduction of the new constitution as well as at the time of the start of the Truth and Reconciliation Commission.  It could be suggested that these two ideas would drive up the topic in the SONA speech.
+
++ In 2005, topic 1 ("Job Creations/Terms of Endearment") dives while topic 4 ("Social Reform/Region and Municipal Government") and Topic 2 ("Economy/Criminal and Justice System") spike considerably
+
+  Mbeki's term in presidency (1998 - 2008) was characterised by a rise in crime specifically in farm attacks as well as the HIV/AID epidemic and the start of the Black Economic Empowerment  in 2005 which could attribute the spikes and drops of topics in 2005.
+
++ In 2012, Topic 2 dives considerably ("Economy/Criminal and Justice System")
+ 
+ From various media reports, Zuma's 2012 SONA speech largely covered the success of the government while skipping over future plans.  It may be a reason while Topic 4 ("Social Reform/Regional and Municipal Government") rises sharply. 
+
+ 
+ 
+ 
+####Step Five: Using the topic to predict the president
+
+One of the aims behind topic modelling is to reduce the dimensions of the data to allow for other techniques to be applied.  In this instance, the aim was to reduce the SONA speeches to a collection of topics that would help predict which president was responsible for a sentence in the SONA speech.  The assumption was that each president might have a unique set of topics or mixture of topics that could characterise their particular speech.  However, there does not seem to be evidence of this.  The matrix with the probability of each sentence belonging to a topic is used in Section X and the results are discussed.
