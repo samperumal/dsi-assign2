@@ -1,11 +1,7 @@
 ---
-title: "DSI Assignment 2 Final Report"
-authors: "Merve Aydin Chester AYDMER001",
-         "Audrey Pentz, PNTAUD001",
-         "Sam Perumal PRMSAM001",
-         "Vanessa Saker, SKRVAN001"
-date: "September 20, 2018"
+title: "Data Analysis"
 output: html_document
+  #html_document: default
 ---
 
 
@@ -16,30 +12,33 @@ output: html_document
 ##---------------------------------##
 
 knitr::opts_chunk$set(
-  echo = TRUE,
-  library(tidyverse),
-  library(tidytext),
-  library(stringr),
-  library(lubridate),
-  library(knitr),
-  library(wordcloud),
-  library(wordcloud2),    #wordcloud
-  library(kableExtra),    #tables
-  library(formattable),   #coloured cell in a table
-  library(keras),
-  library(psych)          #For Cohen's Kappa psych::cohen.kappa()
-  
+  echo = FALSE, eval = FALSE
 )
+
+suppressPackageStartupMessages({
+  require(tidyverse)
+  require(tidytext)
+  require(stringr)
+  require(lubridate)
+  require(knitr)
+  require(wordcloud)
+  require(wordcloud2)    #wordcloud
+  require(kableExtra)    #tables
+  require(formattable)   #coloured cell in a table
+  require(keras)
+  require(psych)          #For Cohen's Kappa psych::cohen.kappa()
+  require(ggrepel) 
+})
 
 ##---------------------------------##
 ## DATA LOADED SO NO NEED TO RELOAD
 ##---------------------------------##
 
-load("~/Downloads/dsi-assign2/input_data.RData")
-load("~/Downloads/dsi-assign2/sentence_data.RData")
-load("~/Downloads/dsi-assign2/balanced_train_data.RData")
-load("~/Downloads/dsi-assign2/audrey/sentiment_all.Rdata")
-load("~/Downloads/dsi-assign2/vanessa/topic_matrix.RData")
+load("input_data.RData")
+load("sentence_data.RData")
+load("balanced_train_data.RData")
+load("audrey/sentiment_all.Rdata")
+load("vanessa/topic_matrix.RData")
 ```
 
 
@@ -54,7 +53,7 @@ We were given 30 State of the Nation (SONA) speeches from 1994 to 2018 to analys
 
 #### **Approach**  
 
-We collaborated using the following GitHub location: https://github.com/samperumal/dsi-assign2. 
+We collaborated using the following GitHub location: **https://github.com/samperumal/dsi-assign2**. 
 
 We initially split the work as follows and each of us created a folder with our names to push our work to for others to view:  
 - Neural Net - Sam and Merve
@@ -62,7 +61,9 @@ We initially split the work as follows and each of us created a folder with our 
 - Topic Modelling - Vanessa
 - Sentiment Analysis - Audrey
 
-We presented our work to each other and made suggestions for improvement. The initial results from the Neural Net gave a 65% accuracy on the validation set and we wanted to feed the results of the Topic Modelling and Sentiment Analysis into the Neural Net to see if it would improve results so we needed to understand from each other what the output of these 2 methods was and the input required by the neural net to get the data into a useable format which took some discussion and a few iterations.
+We presented our work to each other and made suggestions for improvement. Before diving into any prediction, we felt it is important to do an Exploratory Data Analysis (EDA) to get a sense of the high level overview of the dataset. This was done by Audrey.
+
+The initial results from the Neural Net gave a 65% accuracy on the validation set and we wanted to feed the results of the Topic Modelling and Sentiment Analysis into the Neural Net to see if it would improve results so we needed to understand from each other what the output of these 2 methods was and the input required by the neural net to get the data into a useable format which took some discussion and a few iterations.
 
 Given the low accuracy of the neural net (NN), we also tried a Convolutional Neural Net (CNN). Sam got the initial model working. Merve made improvements. Vanessa tuned the hyperparamters.
 ...need more here...
@@ -70,26 +71,88 @@ Given the low accuracy of the neural net (NN), we also tried a Convolutional Neu
 The cnn did not provide much improvement over the NN so we also tried a Recurrent Neural Net (RNN) which takes in sequences of data so the order of the words is also taken into account in the model.
 ...need more here...
 
-Initially we each performed our own import of the data, splitting out the year and president and tokenisation but we realised there was duplication of effort here and different naming conventions which made it difficult to collaborate and use each other's output. In addition, Sam noticed that some of the data was not being read in because of special characters and sentences were not being tokenised correctly for various reasons so he became responsible for performing the data clean up (preprocessing) and outputting a .RData file that we could all then use to rerun our work. This is explained in more detail below and at a high level includes:   
-- removing special characters such as slashes, currency symbols, currency values and numbers  
-- changing bullet points, colons, semi-colons and ellipsis to full stops  
-- changing the word after a full stop to sentence case  
-- removing multiple spaces and multiple full stops  
+#### Data Preparation
 
-Sam also assigned sentence id's using hashing and split the data into training and validation sets so that there would be consistency across what we were working on so that we could use each others work and compare results more easily.
+Initially we each performed our own import of the data, splitting out the year and president and tokenisation but we realised there was duplication of effort here and different naming conventions which made it difficult to collaborate and use each other's output. In addition, Sam noticed that some of the data was not being read in because of special characters and sentences were not being tokenised correctly for various reasons so he became responsible for performing the data clean up (preprocessing) and outputting a .RData file that we could all then use to rerun our work. 
 
-```{r preprocessing}
+The data as provided consisted of 30 text files, with filenames encoding the president's name, the year of the speech, and whether it was pre/post an election (which is absent in non-election years). In working through the files, we discovered that two files were identical which was corrected in the data source with replacement. Additionally, in reading the files, we also identified 3 files that had one or more bytes which caused issues with the standard R file IO routines. Specifically 1 file had a leading Byte-Order-Mark (BOM) which is unique to windows operating system files, and 2 other files had invalid unicode characters, which suggests a text-to-speech processing application was used and experienced either transmissionor storage errors. In all the cases the offending characters were simply removed from the input files. 
 
-# sam
+Having fixed basic read issues, we then examined the content of each file and the simplistic tokenisation achieved by applying *unnest_tokens* to the raw lines read in from the files. Several issues were uncovered, and in each case a **regular expression** was created to correct the issue in the raw read lines:
+
+ * There are multiple characters which are not handled correctly by the default parser, particularly where unicode characters are substituted for standard ASCII characters or are erroneously inserted as part of the text capture. This range of characters were simply removed from the text: **\"“”%’‘[]()–+¬>-**.
+ 
+ * Forward-slashes were converted to a space, to handle both options (hot/cold) and numeric ranges (1998/99).
+ 
+ * Bullet-pointed lists are interpreted as a single, exceptionally long sentence by default. We chose to split this up into a lead-in sentence terminated by a colon, and a list of sentences starting after the bullet point character (\*).
+ 
+ * Numbers (both with and without thousand separator characters) and currency values with leading currency symbols (R/$) were removed.
+ 
+ * Specific punctuation (ellipsis, colon, semi-colon) was considered equivalent to a sentence separator and converted to a full stop: **:;…¦...**.
+ 
+ * Full stops separated by only whitespace were considered redundany and collapsed to a single whitespace character.
+  
+ * All contiguous whitespace was collapsed to a single whitespace character.
+ 
+ * The *unnest_tokens* function relies on each new sentence starting with a capital letter. After the above fixes, it was was therefore necessary to capitalise every character after full stop, to ensure it is recognised as the start of a new sentence.
+ 
+Having fixed the text to allow correct sentence tokenisation, and applied the *unnest_tokens* function, we then determined a unique ID for each sentence by applying a hash digest function to the sentence text. This unique ID allowed everyone to work on the same data with confidence, and also enabled us to detect 72 sentences that appeared identically in at least 2 speeches. As these duplicates would potentially bias the analysis and training, all instances of duplicates were removed from the dataset.
+  
+One final note is that each speech starts with a very similar boiler plate referencing various attendees to the SONA in a single, run-on sentence. We believe this header does not add significantly to the content of the speech, and so we excluded all instances across all speeches.
+
+```{r fig.cap="Change in number of sentences per president before and after filtering.", eval=TRUE}
+comparison_data_set = bind_rows(
+  input_data$sentences %>% mutate(processing = +1), 
+  input_data$unfiltered_sentences %>% mutate(processing = -1)
+) %>% 
+  mutate(year2 = paste(year, ifelse(election == "post", " post", ""), sep = ""))
+
+grouped_data_set = comparison_data_set %>% 
+  group_by(president, year2, processing) %>%
+  summarise(count = n()) %>%
+  select(President = president, year = year2, processing, count) %>% 
+  mutate(signed_count = processing * count) 
+
+changed_data_set = grouped_data_set %>%
+  group_by(President, year) %>%
+  summarise(change = max(signed_count) + min(signed_count))
+  
+changed_data_set %>% ggplot() + geom_col(aes(x = year, y = change, fill = President)) + theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5)) + ylab("Number of sentences") + xlab("Year") + ggtitle("Change in number of sentences per president after filtering.")
+```
+
+The figure above shows the change in number of sentences per president after filtering. On the whole there are more sentences per president, with only a single reduction. Additionally, the highest increases are associated with the files where read-errors prevented us from previously reading the entire file. This change is equally evident in the boxplots below, which show the change in distribution per president of words and characters per sentence. 
+```{r eval=TRUE}
+merged_sentences = bind_rows(input_data$sentences %>% mutate(filter = "Filtered"), input_data$unfiltered_sentences %>% mutate(filter = "Unfiltered"))
+
+merged_sentences %>% mutate(slen = str_length(sentence)) %>% ggplot(aes(x = president, y = slen, colour = president)) + geom_boxplot() + facet_grid(cols = vars(filter)) + xlab("President") + ylab("Sentence length in characters")
+```
+
+```{r eval=TRUE}
+merged_words = bind_rows(input_data$words %>% mutate(filter = "Filtered"), input_data$unfiltered_words %>% mutate(filter = "Unfiltered"))
+
+merged_words %>% group_by(president, filter, id) %>% summarise(n = n()) %>% select(president, filter, n) %>% ggplot(aes(x = president, y = n, colour = president)) + geom_boxplot() + facet_grid(cols = vars(filter)) + xlab("President") + ylab("Sentence length in words")
+```
+
+Overall there is a much tighter grouping of sentences, with less variation and more conistent lengths, which is useful for techniques which depend on equal length inputs. The final histogram below shows the histogram of number of sentences per year/president after filtering, which still bears the same basic shape as before filtering, but with a better profile.
+
+```{r eval=TRUE}
+grouped_data_set %>% 
+  filter(processing == 1) %>% 
+  ggplot() + geom_col(aes(x = year, y = count, fill = President)) + theme(axis.text.x=element_text(angle = 90,hjust = 1,vjust = 0.5)) + ylab("Number of sentences") + xlab("Year") 
 
 ```
 
-Before diving into any analysis, we felt it is important to do an Exploratory Data Analysis (EDA) to get a sense of the high level overview of the dataset. This was done by Audrey.
+#### Data Split and Sampling
+
+For all group work, we separated our full dataset into a random sampling of 80% training and 20% validation data, which was saved into a common .RData file. This ensured that there would be consistency across the data we were working on so that we could use each others work and compare results more easily.
+
+The graphs above make it clear that our data is also very unbalanced. In an attempt to correct for this, we applied supersampling with replacement to the training dataset to ensure an equal number of sentences per president. Training was attempted using both balanced and unbalanced training data, but it did not appear to make much difference. Balancing was conducted on the training dataset only to ensure 
+there are no duplicates in the validation set that might skew validation error.
+
 
 #### **Overview of the dataset**  
 
 Each president has made a certain number of SONA speeches, depending on their term in office and whether there was 1 speech that year or 2 in the year of an election (pre and post election). Since the data is dependent on their term in the office it is unbalanced. Sentence counts per president after cleaning the data is :
-```{r}
+```{r eval=TRUE}
 paste0("President sentence counts:")
 (table(input_data$sentences$president))
 paste0("Baseline_accuracies")
@@ -103,7 +166,7 @@ Let's understand the number of words used by each President and how this varies 
 
 We need to create a metric called "avg_words" which is simply the total number of words across all SONA speeches made by a particular president, divided by the total number of SONA speeches that president made.  
 
-```{r descPres}
+```{r descPres, eval=TRUE}
 
 # sentence tokenization
 tidy_sona_sentences <- input_data$sentences
@@ -158,7 +221,7 @@ On average, Mbeki used the most words in his SONA speeches, followed by Motlanth
 
 #### **Number of words used per SONA**  
 
-```{r descSONA}
+```{r descSONA, eval=TRUE}
 
 # per SONA
 word_count <- tidy_sona_words %>%
@@ -219,7 +282,7 @@ wordcloud2(bigram_count[1:300, ], size = .8, color='random-dark')
 
 Lexical diversity refers to the number of unique words used in each SONA.
 
-```{r diversity}
+```{r diversity, eval=TRUE}
 
 # word tokenization
 diversity_per_year <- input_data$words %>%   # don't remove stop words this time
@@ -254,7 +317,7 @@ If we exclude the post election speeches, the number of unique words used by Mbe
 
 Lexical density refers to the number of unique words used in each SONA divided by the total number of words and a high value is an indicator of word repitition.  
 
-```{r density}
+```{r density, eval=TRUE}
 
 # word tokenization
 density_per_year <- input_data$words %>%   # don't remove stop words this time
@@ -298,7 +361,7 @@ The "bing" lexicon encodes words as either "positive" or "negative". However, no
   
 Let's understand how many "positive" and "negative" words are used by each president across all their SONA speeches and create a metric called "sentiment" which is simply the total number of positive words minus the total number of negative words. We then adjust for the total number of words used from the lexicon in the "sentiment_score" metric.  
   
-```{r bing}
+```{r bing, eval=TRUE}
 
 # average sentiment per president
 avg_sentiment <- tidy_sona_words %>%
@@ -329,7 +392,7 @@ Of the 3 presidents that have made more than 1 SONA speech, Zuma has the highest
   
 ##### **What are the 10 positive words most frequently used by each president?**
   
-```{r}
+```{r  eval=TRUE}
 
 positive_words <- tidy_sona_words %>%
   group_by(president) %>% 
@@ -366,7 +429,7 @@ De Klerk's most used words were "freedom", "peaceful" and "support" and at least
   
 ##### **Which of the positive words most frequently used are common across presidents?**
   
-```{r}
+```{r eval=TRUE}
 
 total_speeches <- tidy_sona_words %>% 
                  group_by(president) %>% 
@@ -390,7 +453,7 @@ tidy_sona_words %>%
 
 ```
   
-##**Insights:**    
+## **Insights:**    
   
 Common positive words across post 1994 presidents include: "freedom", "regard", "support", "improve" and "progress". Words introduced by Mandela and unique to his speeches are: "restructuring", "reconciliation", "committment", "contribution" and "succeed". Mbeki introduces the words "empowerment", "comprehensive", "integrated" and "improving" into the top words used and this is unique to his speeches. Zuma uses the words "success", "reform" and "pleased" frequently and other presidents do not. Ramaphosa introduces the words "significant", "productive", "confidence" and "effectively" which have not yet been seen in the any other SA president's top 10 most frequently used words in a SONA since 1994.  
 
@@ -398,7 +461,7 @@ Common positive words across post 1994 presidents include: "freedom", "regard", 
 
 ##### **What are the 10 negative words most used by each president?**  
 
-```{r negative}
+```{r negative, eval=TRUE}
 
 negative_words <- tidy_sona_words %>%
   group_by(president) %>% 
@@ -427,7 +490,7 @@ negative_words %>%
 
 ```
   
-##**Insights:**   
+## **Insights:**   
   
 Common negative words pre 1994 include: "concerns"/"concern"/"concerned", "unconstitutional", "illusion", "hopeless", "disagree", "deprive", "conflict", and "boycott".
 
@@ -441,7 +504,7 @@ Motlanthe has "conflict" in his top 10 which no other president does. Zuma has "
 
 ##### **How many of the negative words most used were used by each president?**  
     
-```{r}
+```{r  eval=TRUE}
 
 tidy_sona_words %>%
   inner_join(get_sentiments("bing")) %>% 
@@ -461,7 +524,7 @@ tidy_sona_words %>%
   
 ```
   
-##**Insights:**   
+## **Insights:**   
   
 The interpretation is much the same as before. Note the clear separation between the top 10 negative words used pre and post 1994 elections, indicative of the pre and post apartheid regimes.
 
@@ -469,7 +532,7 @@ The interpretation is much the same as before. Note the clear separation between
 
 ##### **What proportion of words used are positive vs negative?**
 
-```{r}
+```{r eval=TRUE}
 
 sentiments_per_year <- tidy_sona_words %>%
   inner_join(get_sentiments("bing")) %>%
@@ -490,7 +553,7 @@ ggplot(filter(sentiments_relative), aes(x = year, y = freq, fill = sentiment)) +
 
 ```
   
-##**Insights:**   
+## **Insights:**   
   
 The 2 vertical black lines are drawn at 60% amd 70% positivity rates. In the majority of years, SONA speeches fall within this range of positivity however a there are a few more negative speeches in earlier years and a few more positive speeches in later years.
 
@@ -498,7 +561,7 @@ The 2 vertical black lines are drawn at 60% amd 70% positivity rates. In the maj
 
 ##### **Change in Sentiment over time**
 
-```{r}
+```{r eval=TRUE}
 
 sentiments_relative %>%
   ggplot(aes(x = as.numeric(year), y = freq, colour = sentiment)) +
@@ -510,7 +573,7 @@ sentiments_relative %>%
 
 ```
   
-##**Insights:**    
+## **Insights:**    
   
 The trend appears to be more positive and less negative over time but how can we be sure?
 
@@ -519,14 +582,14 @@ We will test whether negative sentiment is increasing or decreasing, then we wil
 
 ##### **Is negative sentiment increasing over time?**
 
-```{r modelneg}
+```{r modelneg, eval=TRUE}
 
 model_neg <- glm( freq ~ as.numeric(year), data = subset(sentiments_relative, sentiment == "negative"), family = "binomial")
 summary(model_neg)
 
 ```
 
-##**Insights:**   
+## **Insights:**   
   
 The slope is negative but the beta of the year variable is not significant so we cannot conclude that negative sentiment is decreasing over time.  
 
@@ -534,7 +597,7 @@ The slope is negative but the beta of the year variable is not significant so we
 
 ##### **Is postive sentiment increasing over time?**  
 
-```{r modelpos}
+```{r modelpos, eval=TRUE}
 
 model_pos <- glm( freq ~ as.numeric(year), data = subset(sentiments_relative, sentiment == "positive"), family = "binomial")
 summary(model_pos)
@@ -542,7 +605,7 @@ summary(model_pos)
 ```
   
   
-##**Insights:**   
+## **Insights:**   
   
 The slope is positive but the beta of the year variable is not significant so we cannot conclude that positive sentiment is increasing over time.  
   
@@ -550,7 +613,7 @@ The slope is positive but the beta of the year variable is not significant so we
 
 ##### **Is average sentiment increasing over time?**  
 
-```{r modelavg}
+```{r modelavg, eval=TRUE}
 
 sentiments_per_year <- tidy_sona_words %>%
   inner_join(get_sentiments("bing")) %>%
@@ -565,13 +628,13 @@ summary(model_avg)
 
 ```
   
-##**Insights:**   
+## **Insights:**   
   
 The slope is positive and the beta of the year variable is significant at 1% so we can conclude that average sentiment is increasing over time.  
 
 But we need to be cautious with this interpretation because what could actually be going on here is that the "bing"" lexicon has more than double the number of negative words than positive words so this could be influencing the results and SONA speeches may in fact be more positive than they appear to be.
 
-```{r}
+```{r eval=TRUE}
 
 table(get_sentiments('bing')$sentiment)
 
@@ -581,7 +644,7 @@ table(get_sentiments('bing')$sentiment)
 
 ##### **Distribution of "bing" Sentiment per President**
 
-```{r}
+```{r eval=TRUE}
 
 # per year, per president
 sentiments_per_year <- tidy_sona_words %>%
@@ -599,7 +662,7 @@ ggplot(sentiments_per_year, aes(x = president, y = avg_sentiment, colour = presi
 
 ```
 
-##**Insights:**    
+## **Insights:**    
   
 Apart from the last 2 presidents, Ramaphosa and Zuma, the presidents are in time order. We can see that other than Motlanthe, the trend is an increasing average sentiment over time but at a decreasing rate. The interquartile range of Mbeki is smaller than Zuma's which is smaller than Mandela's.
 
@@ -607,7 +670,7 @@ Apart from the last 2 presidents, Ramaphosa and Zuma, the presidents are in time
 
 ##### **Change in "bing" Sentiment over time**
 
-```{r}
+```{r eval=TRUE}
 
 # per year
 sentiments_per_year <- tidy_sona_words %>%
@@ -628,7 +691,7 @@ sentiments_per_year %>%
 
 ```
   
-##**Insights:**  
+## **Insights:**  
   
 Average sentiment is the proportion of positive words out of all the words in the "bing" lexicon. Mandela shows a very erratic average sentiment, ranging from 0 to over 25. Mbeki and Zuma's average sentiment mostly ranges between 25 and 50, with the exception of a few such as 2000, 2008, 2012, 2017. 
 
@@ -636,7 +699,7 @@ Average sentiment is the proportion of positive words out of all the words in th
 
 ##### **Sentiment Analysis using "afinn" lexicon (scale from -5 negative to +5 positive)**
 
-```{r afinn}
+```{r afinn, eval=TRUE}
 
 tidy_sona_words %>%
   inner_join(get_sentiments("afinn")) %>%
@@ -652,7 +715,7 @@ tidy_sona_words %>%
 
 ```
   
-##**Insights:**  
+## **Insights:**  
   
 The most number of words are scored positive 2, followed by positive 1. This becomes even more pronounced when scores are multiplied by counts to get weighted scores.
   
@@ -660,7 +723,7 @@ The most number of words are scored positive 2, followed by positive 1. This bec
 
 Let's check the distribution of all "afinn" words:
 
-```{r}
+```{r eval=TRUE}
 
 table(get_sentiments('afinn')$score)
 
@@ -672,7 +735,7 @@ Words with a score of -2 dominate the lexicon, followed by words with a score of
 
 ##### **Distribution of "afinn" Sentiment per President**
 
-```{r}
+```{r eval=TRUE}
 
 # per year, per president
 sentiments_per_year <- tidy_sona_words %>%
@@ -692,7 +755,7 @@ ggplot(sentiments_per_year, aes(x = president, y = afinn_sentiment_perc, colour 
 
 ```
 
-##**Insights:**    
+## **Insights:**    
   
 The interpretation is much the same as with the "bing" lexicon in that the trend is an increasing average sentiment over time however Zuma's median sentiment is lower than the general trend.
 
@@ -700,7 +763,7 @@ The interpretation is much the same as with the "bing" lexicon in that the trend
 
 ##### **Change in "afinn" Sentiment over time**
 
-```{r}
+```{r eval=TRUE}
 
 sentiments_per_year %>%
   ggplot(aes(x = as.numeric(year), y = afinn_sentiment, colour = president)) +
@@ -712,7 +775,7 @@ sentiments_per_year %>%
 
 ```
   
-##**Insights:**    
+## **Insights:**    
   
 Mandela and Zuma show a wave-like pattern of sentiment. Mbeki shows an increasing and then decreasing pattern.
   
@@ -720,7 +783,7 @@ Mandela and Zuma show a wave-like pattern of sentiment. Mbeki shows an increasin
 
 ##### **Sentiment Analysis using "nrc" lexicon (infers emotion with certain words)**
 
-```{r}
+```{r eval=TRUE}
 
 president_total <- tidy_sona_words %>% 
   group_by(president) %>% 
@@ -751,13 +814,13 @@ tidy_sona_words %>%
   
 Let's check the distribution of all "nrc" words:
 
-```{r}
+```{r eval=TRUE}
 
 table(get_sentiments('nrc')$sentiment)
 
 ```
   
-##**Insights:**  
+## **Insights:**  
    
 Words can be assigned more than 1 sentiment but we do not expect as many words to come up under "anticipation", "joy" or "surprise" given the relatively lower counts in the lexicon. So "anticipation" has a surprisingly high relative count across all presidents.  
 
@@ -767,7 +830,7 @@ Given that "positive" sentiment is the most frequent classification in the "nrc"
 
 ##### **Sentiment Analysis using "nrc" lexicon**
 
-```{r}
+```{r eval=TRUE}
 
 nrc_sentiment <- tidy_sona_words %>%
   inner_join(get_sentiments("nrc")) %>%
@@ -801,7 +864,7 @@ nrc_sentiment %>%
 ```
 
   
-##**Insights:**  
+## **Insights:**  
    
 The negative most used words which are also associated with the "anger", "disgust", fear" and "sadness" emotions are: "violence", "struggle" and "poverty". 
 
@@ -824,8 +887,7 @@ The most usedwords that evoke the "trust" emotion are: "system", "president", "p
 
 The count of each word that have been used in each sentence is what we are going to be feeding in. We need to unnest the sentence data, count each word in each sentence and spread the sentence word counts so that we have sentence id's in each row and we have each word as column id's. This is the simplest neural net model that we can try, so that was our first model.
 
-```{r}
-library(RcppParallel)
+```{r eval=FALSE}
 #Unnest words and count
 president_word_count = input_data$sentences %>%
   group_by(president) %>%
@@ -900,7 +962,7 @@ model %>% fit(x_train, y_train, epochs = 10, batch_size = 32, validation_data = 
 This model has L2 regularization to avoid overfitting but even so it didn't help very much. The accuracy is 0.55886. The optimizer_rmsprop has learning rate 0.003. This was choosen after trying lr=c(0.001, 0.002, 0.003) To make readability easier the model with best learning rate is used. 
 
 As we can see from the plot model overfits after the second iteration, since the loss function start increasing in value, so to avoid that let's use a smaller model with less neurons and add a dropout.
-```{r}
+```{r eval=FALSE}
 model <- keras_model_sequential() #Creating an empty sequential model
 
 #Define a model by sequentially adding layers. Add a simple model so it does not overfit.
@@ -966,14 +1028,14 @@ head(predictions_val %>% filter(prez == "deKlerk") %>% select(pres.max, pres.act
 table_bow <- table(predictions_val$pres.actual, predictions_val$pres.max)
 paste0("Accuracy rate is:" ,round((sum(diag(table))/sum(table)),4))
 ```
-####**Cohen's Kappa**
+#### **Cohen's Kappa**
 
 Kappa value tells you how much better your classifier is performing over the performance of a classifier that simply guesses at random according to the frequency of each class.
 
-"Cohen�s kappa is always less than or equal to 1. Values of 0 or less, indicate that the classifier is useless. There is no standardized way to interpret its values. Landis and Koch (1977) provide a way to characterize values. According to their scheme a value < 0 is indicating no agreement , 0???0.20 as slight, 0.21???0.40 as fair, 0.41???0.60 as moderate, 0.61???0.80 as substantial, and 0.81???1 as almost perfect agreement."
+"Cohen?s kappa is always less than or equal to 1. Values of 0 or less, indicate that the classifier is useless. There is no standardized way to interpret its values. Landis and Koch (1977) provide a way to characterize values. According to their scheme a value < 0 is indicating no agreement , 0???0.20 as slight, 0.21???0.40 as fair, 0.41???0.60 as moderate, 0.61???0.80 as substantial, and 0.81???1 as almost perfect agreement."
 [Reference: Landis, J.R.; Koch, G.G. (1977). ???The measurement of observer agreement for categorical data???. Biometrics 33 (1): 159???174]
 
-```{r}
+```{r eval=FALSE}
 # Calculate kappa by hand
 t = as.matrix(table_bow)
 
@@ -1006,7 +1068,7 @@ After the fourth iteration validation loss starts increasing which is a sign of 
 
 TFIDF is a statisic that shows how important a word is to it's corpus. So if we are feeding NN with TFIDF we are logically expecting the results to be slightly better than the word-cout NN model. 
 
-```{r tfidf}
+```{r tfidf, eval=FALSE}
 tidy_sona = input_data$sentences %>%
   unnest_tokens(word, sentence, token = "words") %>% 
   select(id, word, year, president) 
@@ -1124,8 +1186,8 @@ head(predictions_val %>% filter(prez == "deKlerk") %>% select(pres.max, pres.act
 table_tfidf <- table(predictions_val$pres.actual, predictions_val$pres.max)
 paste0("Accuracy rate is:" , round((sum(diag(t))/sum(t)),4))
 ```
-####**Cohen's Kappa**
-```{r}
+#### **Cohen's Kappa**
+```{r eval=FALSE}
 table_tfidf = cbind(table_tfidf, "4" = rep(0, 6), "5" = rep(0, 6),"6" = rep(0, 6))#make it square
 
 library(psych)
@@ -1133,10 +1195,10 @@ cohen.kappa(table_tfidf)[1] #Doing slightly better than random classifier.
 ```
 The accuracy is 0.6158 and the model starts overfitting after fourth epoch. So this is slightly better than the bag of words word-count model as we expected.
 
-###**Neural Net with Sentiment Analysis Data**
-```{r nnwith}
+### **Neural Net with Sentiment Analysis Data**
+```{r nnwith, eval=FALSE}
 #The preparation of this file can be found in the same directory as the .Rdata file.
-load("~/Downloads/dsi-assign2/audrey/sentiment_all.Rdata")
+load("audrey/sentiment_all.Rdata")
 
 set.seed(123)
 
@@ -1229,9 +1291,9 @@ paste0("Accuracy rate is:" , round((sum(diag(t))/sum(t)),4))
 ```
 
 
-####**Cohen's Kappa**
+#### **Cohen's Kappa**
 
-```{r}
+```{r eval=FALSE}
 
 table_sentiment = cbind(table_sentiment,"3"=rep(0,6), "4" = rep(0, 6), "5" = rep(0, 6),"6" = rep(0, 6))
 library(psych)
@@ -1240,10 +1302,10 @@ cohen.kappa(table_sentiment)[1]
 ```
 Sentiment analysis also reaches it's smallest validation loss value on the fifth iteration. But the train accuracy and test accuracy is changing very slightly at each iteration. This model does not seem to be doing well on eighter the training set or the test set. The test accuracy is 0.4361834 and the training accuracy is 0.4353395. If we look at the NRC sentiment lexicon it is visible that all presidents share same sentiment distribution pattern, so this is why it is not overfitting. Because our set aside test set is actually no different than the training set.
 
-###**Neural Nets with Topic Modelling Data (Gamma Values)**
-```{r}
+### **Neural Nets with Topic Modelling Data (Gamma Values)**
+```{r eval=FALSE}
 #The preparation of this topic_matrix can be found in the 
-load("~/Downloads/dsi-assign2/vanessa/topic_matrix.RData")
+load("vanessa/topic_matrix.RData")
 
 sona_gamma = topic_matrix
 sona_gamma[is.na(sona_gamma)] <- 0
@@ -1334,8 +1396,8 @@ paste0("Accuracy rate is:" , round((sum(diag(t))/sum(t)),4))
 ```
 Topic modelling only predicted for president 1(Mbeki) and president 2(Zuma).
 
-####**Cohen's Kappa**
-```{r}
+#### **Cohen's Kappa**
+```{r eval=FALSE}
 
 table_topic = cbind(table_topic,"3"=rep(0,6), "4" = rep(0, 6), "5" = rep(0, 6),"6" = rep(0, 6))#make it square
 library(psych)
@@ -1345,7 +1407,7 @@ cohen.kappa(table)[1] #it is doing fairly better than a randomly guessing classi
 The train and the test set are not very distinct from each other just like sentiment analysis. 
 If we look at the mixture of the topics by each president in topic modelling chunk we can see that all the topics for each president are kind of uniformed and hard to seperate each president's topic from one another.
 
-###**CNN with Transfer Learning \n(Pre-trained Embeddings)**
+### **CNN with Transfer Learning (Pre-trained Embeddings)**
 
 We will be using GloVe embeddings. GloVe stands for "Global Vectors for Word Representation" and is an unsupervised learning algorithm for obtaining vector representations for words as it is stated in their website. Training is performed on aggregated global word-word co-occurrence statistics from a corpus, and the resulting representations showcase interesting linear substructures of the word vector space.
 [Reference:Jeffrey Pennington, Richard Socher, and Christopher D. Manning. 2014. GloVe: Global Vectors for Word Representation:https://nlp.stanford.edu/pubs/glove.pdf ]
@@ -1362,7 +1424,7 @@ This note is taken from the reference given above and as they state the accuracy
 
 Also for the pre-trained embeddings to work well it needs to be trained with similar type of data that you are trying to classify, and the fact that the GloVe embeddings are trained on Wikipedia data one can expect that it would not neccesarily help predict the presidents better for our sentences.
 
-```{r}
+```{r eval=FALSE}
 library(keras)
 
 #Load the data we are going to be embedding
@@ -1551,8 +1613,8 @@ Majority of the sentences of Mothlane(38/66) is predicted as Mandela.
 Majority of sentences of Ramaphosa is predicted as Mandela(19/47) or Zuma(15/47).
 Mojority of the sentences of deKlerk is predicted as Mandela(14/17).
 
-####**Cohen's Kappa**
-```{r}
+#### **Cohen's Kappa**
+```{r eval=FALSE}
 library(psych)
 cohen.kappa(t) #0.116 #We are doing slightly better than random classifier.
 ```
@@ -1640,4 +1702,4 @@ https://keras.rstudio.com/articles/examples/pretrained_word_embeddings.html
 
 https://github.com/rstudio/keras/blob/master/vignettes/examples/pretrained_word_embeddings.R
 
-Landis, J.R.; Koch, G.G. (1977). ???The measurement of observer agreement for categorical data???. Biometrics 33 (1): 159???174
+Landis, J.R.; Koch, G.G. (1977). "The measurement of observer agreement for categorical data". Biometrics 33 (1): 159-174
