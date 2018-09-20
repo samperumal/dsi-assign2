@@ -12,7 +12,7 @@ output: html_document
 ##---------------------------------##
 
 knitr::opts_chunk$set(
-  echo = FALSE, eval = FALSE
+  echo = FALSE, eval = TRUE
 )
 
 suppressPackageStartupMessages({
@@ -1032,8 +1032,8 @@ paste0("Accuracy rate is:" ,round((sum(diag(table))/sum(table)),4))
 
 Kappa value tells you how much better your classifier is performing over the performance of a classifier that simply guesses at random according to the frequency of each class.
 
-"Cohen?s kappa is always less than or equal to 1. Values of 0 or less, indicate that the classifier is useless. There is no standardized way to interpret its values. Landis and Koch (1977) provide a way to characterize values. According to their scheme a value < 0 is indicating no agreement , 0???0.20 as slight, 0.21???0.40 as fair, 0.41???0.60 as moderate, 0.61???0.80 as substantial, and 0.81???1 as almost perfect agreement."
-[Reference: Landis, J.R.; Koch, G.G. (1977). ???The measurement of observer agreement for categorical data???. Biometrics 33 (1): 159???174]
+"Cohen’s kappa is always less than or equal to 1. Values of 0 or less, indicate that the classifier is useless. There is no standardized way to interpret its values. Landis and Koch (1977) provide a way to characterize values. According to their scheme a value < 0 is indicating no agreement, 0-0.20 as slight, 0.21–0.40 as fair, 0.41–0.60 as moderate, 0.61–0.80 as substantial, and 0.81–1 as almost perfect agreement."
+[Reference: Landis, J.R.; Koch, G.G. (1977). "The measurement of observer agreement for categorical data". Biometrics 33 (1): 159–174]
 
 ```{r eval=FALSE}
 # Calculate kappa by hand
@@ -1054,7 +1054,6 @@ paste0("Kappa value is ", round(k, 3), ", and this means we are doing better tha
 
 table_bow = cbind(table_bow, "4" = rep(0, 6), "5" = rep(0, 6),"6" = rep(0, 6))#make it square
 #As we have seen from the table above the nn did not predict anything for the minority classes so we have to cbind zeros as 4th,5th,6th columns. Because we need a square matrix for calculating Cohen's Kappa when using cohen.kappa() function.
-library(psych)
 cohen.kappa(table_bow)[1]
 
 ```
@@ -1190,7 +1189,6 @@ paste0("Accuracy rate is:" , round((sum(diag(t))/sum(t)),4))
 ```{r eval=FALSE}
 table_tfidf = cbind(table_tfidf, "4" = rep(0, 6), "5" = rep(0, 6),"6" = rep(0, 6))#make it square
 
-library(psych)
 cohen.kappa(table_tfidf)[1] #Doing slightly better than random classifier.
 ```
 The accuracy is 0.6158 and the model starts overfitting after fourth epoch. So this is slightly better than the bag of words word-count model as we expected.
@@ -1296,7 +1294,6 @@ paste0("Accuracy rate is:" , round((sum(diag(t))/sum(t)),4))
 ```{r eval=FALSE}
 
 table_sentiment = cbind(table_sentiment,"3"=rep(0,6), "4" = rep(0, 6), "5" = rep(0, 6),"6" = rep(0, 6))
-library(psych)
 cohen.kappa(table_sentiment)[1]
 
 ```
@@ -1400,7 +1397,6 @@ Topic modelling only predicted for president 1(Mbeki) and president 2(Zuma).
 ```{r eval=FALSE}
 
 table_topic = cbind(table_topic,"3"=rep(0,6), "4" = rep(0, 6), "5" = rep(0, 6),"6" = rep(0, 6))#make it square
-library(psych)
 cohen.kappa(table)[1] #it is doing fairly better than a randomly guessing classifier.
 
 ```
@@ -1425,8 +1421,6 @@ This note is taken from the reference given above and as they state the accuracy
 Also for the pre-trained embeddings to work well it needs to be trained with similar type of data that you are trying to classify, and the fact that the GloVe embeddings are trained on Wikipedia data one can expect that it would not neccesarily help predict the presidents better for our sentences.
 
 ```{r eval=FALSE}
-library(keras)
-
 #Load the data we are going to be embedding
 load("~/Downloads/dsi-assign2/input_data.RData")
 load("~/Downloads/dsi-assign2/balanced_train_data.RData")
@@ -1615,7 +1609,6 @@ Mojority of the sentences of deKlerk is predicted as Mandela(14/17).
 
 #### **Cohen's Kappa**
 ```{r eval=FALSE}
-library(psych)
 cohen.kappa(t) #0.116 #We are doing slightly better than random classifier.
 ```
 
@@ -1625,7 +1618,7 @@ cohen.kappa(t) #0.116 #We are doing slightly better than random classifier.
 ## **Neural Net (nn) to predict the President from a Sentence**
 
 
-```{r nn}
+```{r nn, eval=FALSE}
 
 # sam / merve?? 
 # merve says: I have actually done my predictions within chunks, so we can remove this part. Votes?
