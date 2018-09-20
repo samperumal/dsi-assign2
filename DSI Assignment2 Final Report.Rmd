@@ -283,6 +283,8 @@ Bag of Words Model
 # audrey
 
 ```
+#### **Neural Nets **
+
 ## **Bag of Words Neural Net**
 
 The count of each word that have been used in each sentence is what we are going to be feeding in. We need to unnest the sentence data, count each word in each sentence and spread the sentence word counts so that we have sentence id's in each row and we have each word as column id's. This is the simplest neural net model that we can try, so that was our first model.
@@ -370,7 +372,7 @@ model %>%
   layer_dense(units = 16, activation = 'relu', input_shape = ncol(x_train)) %>%
   layer_dropout(0.03) %>%
   layer_dense(units = 16, activation = 'relu', 
-              kernel_regularizer = regularizer_l2(0.01)) %>%  #Dense layer with L2 regulerizer 
+              kernel_regularizer = regularizer_l2(0.01)) %>%  #Dense layer with L2 regularizer 
   layer_dropout(0.01) %>%
   layer_dense(units = 6, activation = 'softmax') %>%       #6 neurons since we have six presidents
   compile(
@@ -436,12 +438,11 @@ Just for the word-count model seems good enough. But this model does not conside
 
 After the fourth iteration validation loss starts increasing which is a sign of overfitting. 
 
-## **Bag of Words NN using tf-idf**
+## **NN using tf-idf**
 
 TFIDF is a statisic that shows how important a word is to it's corpus. So if we are feeding NN with TFIDF we are logically expecting the results to be slightly better than the word-cout NN model. 
 
 ```{r tfidf}
-
 tidy_sona = input_data$sentences %>%
   unnest_tokens(word, sentence, token = "words") %>% 
   select(id, word, year, president) 
@@ -459,10 +460,12 @@ sona_tf_idf <- sona_tdf %>%
 
 #Get presidents names where id's match
 nm <- c("id", "president")
-sona_tf_idf[nm] <- lapply(nm, function(x) df[[x]][match(sona_tf_idf$id, df$id)])
+df = input_data$sentences
+sona_tf_idf[nm] <- lapply(nm, function(x) df[[x]][match(sona_tf_idf$id, input_data$sentences$id)])
 
 
 # Spreading the data
+
 tf_idf_wide <- sona_tf_idf %>% 
   select(ID = id, prez = president, word, tf_idf) %>%  # note the change, using tf-idf
   spread(key = word, value = tf_idf, fill = 0)
@@ -520,7 +523,6 @@ model %>% fit(x_train, y_train, epochs = 10, batch_size = 32, validation_data = 
 
 model %>% evaluate(x_test, y_test, batch_size=32, verbose = 1) #0.6146221 accuracy rate
 
-
 predictions <- model %>% predict(x_test)
 predictions2 = model %>% predict_classes(x_test)
 range(predictions)
@@ -558,8 +560,10 @@ k = (prob_a - prob_b)/(1-prob_b)
 paste0("Kappa value is ", round(k, 3), ", and this means the results have no agreement!")
 
 ```
+The accuracy is 0.6158 and the model starts overfitting after fourth epoch. So this is slightly better than the bag of words word-count model as we expected.
+
 ###Neural Nets with Sentiment Analysis Data
-```{r}
+```{r nnwith}
 #The preparation of this file can be found in the same directory as the .Rdata file.
 load("~/Downloads/dsi-assign2/audrey/sentiment_all.Rdata")
 
@@ -615,13 +619,15 @@ model %>%
     metrics = c('accuracy')
   )
 
-model %>% fit(x_train, y_train, epochs = 10, batch_size = 32 ,validation_data = list(x_test, y_test)) %>% plot()
+model %>% fit(x_train, y_train, epochs = 20, batch_size = 32 ,validation_data = list(x_test, y_test)) %>% plot()
 
-(accuracy_sentiment = (model %>% evaluate(x_test, y_test))$acc)
+(accuracy_sentiment_test = (model %>% evaluate(x_test, y_test))$acc)
+(accuracy_sentiment_train = (model %>% evaluate(x_train, y_train))$acc)
+
 
 paste0("Accuracy of sentiment analysis is ", round(accuracy_sentiment,3))
 ```
-Sentiment analysis also reaches it's smallest validation loss value on the second iteration. But the train accuracy and test accuracy is changing very slightly at each iteration. This model does not seem to be doing well on eighter the training set or the test set.
+Sentiment analysis also reaches it's smallest validation loss value on the fifth iteration. But the train accuracy and test accuracy is changing very slightly at each iteration. This model does not seem to be doing well on eighter the training set or the test set. The test accuracy is 0.4361834 and the training accuracy is 0.4353395. If we look at the NRC sentiment lexicon it is visible that all presidents share same sentiment distribution pattern, so this is why it is not overfitting. Because our set aside test set is actually no different than the training set.
 
 ### Neural Nets with Topic Modelling Gamma Values
 ```{r}
@@ -688,18 +694,34 @@ model %>% fit(x_train, y_train, epochs = 10, batch_size = 32, validation_data = 
 
 model %>% evaluate(x_test, y_test)
 
-topic_matrix %>% left_join(sentiment_all)
 ```
+The train and the test set are not very distinct from each other just like sentiment analysis. 
+If we look at the mixture of the topics by each president in topic modelling chunk we can see that all the topics for each president are kind of uniformed and hard to seperate each president's topic from one another.
 
-###GloVe word embeddings
-We will be using GloVe embeddings. GloVe is an unsupervised learning algorithm for obtaining vector representations for words. Training is performed on aggregated global word-word co-occurrence statistics from a corpus, and the resulting representations showcase interesting linear substructures of the word vector space." 
-GloVe stands for "Global Vectors for Word Representation". It's a popular embedding technique.
+###Transfer learning using pre-trained embeddings
+
+We will be using GloVe embeddings. GloVe stands for "Global Vectors for Word Representation" and is an unsupervised learning algorithm for obtaining vector representations for words as it is stated in their website. Training is performed on aggregated global word-word co-occurrence statistics from a corpus, and the resulting representations showcase interesting linear substructures of the word vector space.
 [Reference:Jeffrey Pennington, Richard Socher, and Christopher D. Manning. 2014. GloVe: Global Vectors for Word Representation:https://nlp.stanford.edu/pubs/glove.pdf ]
 Specifically, we will use the 100-dimensional GloVe embeddings of 400k words computed on a 2014 dump of English Wikipedia. 
-reference: https://blog.keras.io/using-pre-trained-word-embeddings-in-a-keras-model.html
-reference: https://keras.rstudio.com/reference/save_text_tokenizer.html
+
+This note is taken from the reference given above and as they state the accuracy they achieved on python is twice as good.
+
+"IMPORTANT NOTE:This example does yet work correctly. The code executes fine and appears to mimic the Python code upon which it is based however it achieves only half the training accuracy that the Python code does so there is clearly a subtle difference. We need to investigate this further before formally adding to the list of examples"
+
+[reference for implementation on Python: https://blog.keras.io/using-pre-trained-word-embeddings-in-a-keras-model.html]
+[reference for implementation on R: https://keras.rstudio.com/articles/examples/pretrained_word_embeddings.html]
+[reference for implementation on R: https://github.com/rstudio/keras/blob/master/vignettes/examples/pretrained_word_embeddings.R]
+
+
+Also for the pre-trained embeddings to work well it needs to be trained with similar type of data that you are trying to classify, and the fact that the GloVe embeddings are trained on Wikipedia data one can expect that it would not neccesarily help predict the presidents better for our sentences.
+
 ```{r}
 library(keras)
+
+#Load the data we are going to be embedding
+load("~/Downloads/dsi-assign2/input_data.RData")
+load("~/Downloads/dsi-assign2/balanced_train_data.RData")
+load("~/Downloads/dsi-assign2/sentence_data.RData")
 
 #Settings for gloves embedding
 GLOVE_DIR <- 'glove.6B'
@@ -747,12 +769,8 @@ tokenizer %>% fit_text_tokenizer(input_data$sentences$sentence)
 
 # save the tokenizer in case we want to use it again
 # for prediction within another R session, see:
-# 
-#https://blog.keras.io/using-pre-trained-word-embeddings-in-a-keras-model.html
+# https://keras.rstudio.com/reference/save_text_tokenizer.html
 save_text_tokenizer(tokenizer, "tokenizer")
-
-# If you want to use the same text tokenizer use this:
-# load_text_tokenizer("tokenizer")
 
 sequences_train = texts_to_sequences(tokenizer, balanced_train_data$sentence)
 sequences_valid = texts_to_sequences(tokenizer, sentence_data$validate$sentence)
@@ -774,10 +792,10 @@ response_tokenizer$fit_on_texts(sentence_data$validate$president )
 y_train = (response_tokenizer$texts_to_matrix(balanced_train_data$president, mode = "binary"))[,-1]
 y_val = (response_tokenizer$texts_to_matrix(sentence_data$validate$president , mode = "binary"))[,-1]
 
-cat('Shape of data tensor: ', dim(data_train), '\n')
-cat('Shape of data tensor: ', dim(data_valid), '\n')
+cat('Shape of data tensor: ', dim(x_train), '\n')
+cat('Shape of data tensor: ', dim(x_val), '\n')
 cat('Shape of label tensor: ', dim(y_train), '\n')
-cat('Shape of data tensor: ', dim(y_test), '\n')
+cat('Shape of data tensor: ', dim(y_val), '\n')
 
 
 # prepare embedding matrix
@@ -840,22 +858,13 @@ model %>% compile(
 model %>% fit(
   x_train, y_train,
   batch_size = 128,
-  epochs = 15,
+  epochs = 11,
   validation_data = list(x_val, y_val)
 ) %>% plot()
 
-#Since the validation loss is still decreasing and the accuracy was increasing we will run 5 more epochs
-model %>% 
-  fit(x_train, y_train, epochs = 5, batch_size = 128,validation_data = list(x_val, y_val)) %>% 
-  plot()
-
-model %>% evaluate(x_val, y_val)
-#The accuracy results are improved by 2% when using the balanced data set(see dsi-assign2/merve/pre-trained-embeddings-final), so this says that there might be a better way to balance the data like **smote** 
-#The accuracy of the 0.4479554
-#As mentioned in the important note part in Keras' website, this code mimics the python code but it is half as successful, so they are pointing this issue there. See: https://github.com/rstudio/keras/blob/master/vignettes/examples/pretrained_word_embeddings.R
-
-
+#Getting the predictions:
 predictions <- model %>% predict(x_val)
+
 range(predictions)
 
 
@@ -870,15 +879,22 @@ pres.actual <- apply(y_val,1,which.max)
 
 
 predictions_val <- cbind(sentence_data$validate,pres.max,pres.actual)
-View(head(predictions_val, n= 100))
-predictions_val %>% filter(president == "Mbeki")
+# View(head(predictions_val, n= 100))
+predictions_val %>% filter(president == "Mbeki") %>% select(pres.max, pres.actual) #President numero 1
+predictions_val %>% filter(president == "Zuma") %>% select(pres.max, pres.actual) #President numero 2
+predictions_val %>% filter(president == "Mandela") %>% select(pres.max, pres.actual) #President numero 3
+predictions_val %>% filter(president == "Motlanthe") %>% select(pres.max, pres.actual) #President numero 4
+predictions_val %>% filter(president == "Ramaphosa") %>% select(pres.max, pres.actual) #President numero 5
+predictions_val %>% filter(president == "deKlerk") %>% select(pres.max, pres.actual) #President numero 6
 
-t = table(predictions_val$pres.max, predictions_val$pres.actual)
+(t = table(predictions_val$pres.max, predictions_val$pres.actual))
+(table(input_data$sentences$president))
 
-
+(baseline_accuracies = table(input_data$sentences$president)*100/sum(table(input_data$sentences$president)))
 ```
-
-
+Majority of the sentences of Mothlane(38/66) is predicted as Mandela,
+Majority of sentences of Ramaphosa is predicted as Mandela(19/47) or Zuma(15/47),
+Mojority of the sentences of deKlerk is predicted as Mandela(14/17).
 
 ## **Topic Modelling**
 
