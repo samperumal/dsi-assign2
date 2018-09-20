@@ -23,11 +23,11 @@ knitr::opts_chunk$set(
   library(lubridate),
   library(knitr),
   library(wordcloud),
-  library(wordcloud2),    # wordcloud
-  library(kableExtra),    # tables
-  library(formattable),    # coloured cell in a table
+  library(wordcloud2),    #wordcloud
+  library(kableExtra),    #tables
+  library(formattable),   #coloured cell in a table
   library(keras),
-  library(psych)
+  library(psych)          #For Cohen's Kappa psych::cohen.kappa()
   
 )
 
@@ -94,8 +94,9 @@ paste0("President sentence counts:")
 (table(input_data$sentences$president))
 paste0("Baseline_accuracies")
 (baseline_accuracies = table(input_data$sentences$president)*100/sum(table(input_data$sentences$president)))
-```
 
+#Since the baseline accuracies as given above, as very unbalanced, it is expected that the majority classes will be predicted over the minority.
+```
 Let's understand the number of words used by each President and how this varies across each SONA speech. 
 
 #### **Average number of words used per President**  
@@ -306,6 +307,7 @@ De Klerk repeated over 30% of his words in his 1994 pre election SONA speech. On
 The count of each word that have been used in each sentence is what we are going to be feeding in. We need to unnest the sentence data, count each word in each sentence and spread the sentence word counts so that we have sentence id's in each row and we have each word as column id's. This is the simplest neural net model that we can try, so that was our first model.
 
 ```{r}
+
 #Unnest words and count
 president_word_count = input_data$sentences %>%
   group_by(president) %>%
@@ -484,7 +486,7 @@ sona_tf_idf <- sona_tdf %>%
 #Get presidents names where id's match
 nm <- c("id", "president")
 df = input_data$sentences
-sona_tf_idf[nm] <- lapply(nm, function(x) df[[x]][match(sona_tf_idf$id, input_data$sentences$id)])
+sona_tf_idf[nm] <- lapply(nm, function(x) df[[x]][match(sona_tf_idf$id, df$id)])
 
 
 # Spreading the data
@@ -570,22 +572,13 @@ predictions_val <- cbind(test_sona, pres.actual, pres.max)
 predictions_val = predictions_val %>% select(prez, pres.actual, pres.max)
 
 
-table <- table(predictions_val$pres.actual, predictions_val_2$pres.max)
+table <- table(predictions_val$pres.actual, predictions_val$pres.max)
 paste0("Accuracy rate is:" , round((sum(diag(t))/sum(t)),4))
 
-# Calculate kappa by hand
-t = as.matrix(table)
-t = cbind(t, "4" = colSums(t)/sum(colSums(t)))
-t = rbind(t, "7" = rowSums(t)/sum(rowSums(t)))
-t[7,4] = 0
+# Calculate kappa
 
-prob_a = sum(diag(table))/sum(colSums(table))
-prob_b = (t[7,1]*t[1,4]) + (t[7,2]*t[2,4]) +(t[7,3]*t[3,4])
-
-k = (prob_a - prob_b)/(1-prob_b)
-
-
-paste0("Kappa value is ", round(k, 3), ", and this means the results are better than a random classifier")
+library(psych)
+cohen.kappa(table)
 
 ```
 The accuracy is 0.6158 and the model starts overfitting after fourth epoch. So this is slightly better than the bag of words word-count model as we expected.
@@ -681,7 +674,7 @@ predictions_val = predictions_val %>% select(president, pres.actual, pres.max)
 table <- table(predictions_val$pres.actual, predictions_val$pres.max)
 paste0("Accuracy rate is:" , round((sum(diag(t))/sum(t)),4))
 ```
-## Cohen's Kappa
+#**Cohen's Kappa**
 
 'Cohen¢s kappa is always less than or equal to 1. Values of 0 or less, indicate that the classifier is useless. There is no standardized way to interpret its values. Landis and Koch (1977) provide a way to characterize values. According to their scheme a value < 0 is indicating no agreement , 0???0.20 as slight, 0.21???0.40 as fair, 0.41???0.60 as moderate, 0.61???0.80 as substantial, and 0.81???1 as almost perfect agreement.'
 [Reference: Landis, J.R.; Koch, G.G. (1977). ???The measurement of observer agreement for categorical data???. Biometrics 33 (1): 159???174]
@@ -819,7 +812,7 @@ paste0("Kappa value is ", round(k, 3), ", and this means the results have no agr
 The train and the test set are not very distinct from each other just like sentiment analysis. 
 If we look at the mixture of the topics by each president in topic modelling chunk we can see that all the topics for each president are kind of uniformed and hard to seperate each president's topic from one another.
 
-###**CNN with max-pooling Using Transfer Learning (Pre-trained Embeddings)**
+###**CNN with Transfer Learning \n(Pre-trained Embeddings)**
 
 We will be using GloVe embeddings. GloVe stands for "Global Vectors for Word Representation" and is an unsupervised learning algorithm for obtaining vector representations for words as it is stated in their website. Training is performed on aggregated global word-word co-occurrence statistics from a corpus, and the resulting representations showcase interesting linear substructures of the word vector space.
 [Reference:Jeffrey Pennington, Richard Socher, and Christopher D. Manning. 2014. GloVe: Global Vectors for Word Representation:https://nlp.stanford.edu/pubs/glove.pdf ]
