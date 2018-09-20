@@ -26,7 +26,8 @@ knitr::opts_chunk$set(
   library(wordcloud2),    # wordcloud
   library(kableExtra),    # tables
   library(formattable),    # coloured cell in a table
-  library(keras)
+  library(keras),
+  library(psych)
   
 )
 
@@ -373,7 +374,8 @@ model %>% fit(x_train, y_train, epochs = 10, batch_size = 32, validation_data = 
 ) %>% plot()
 
 #Evaluate the model
-model %>% evaluate(x_test, y_test, batch_size=32, verbose = 1) #0.55886
+(test_accuracy_wordcount_bigger = model %>% evaluate(x_test, y_test, batch_size=32, verbose = 1)) #0.55886
+(train_accuracy_wordcount_bigger = model %>% evaluate(x_train, y_train, batch_size=32, verbose = 1))
 ```
 This model has L2 regularization to avoid overfitting but even so it didn't help very much. The accuracy is 0.55886. The optimizer_rmsprop has learning rate 0.003. This was choosen after trying lr=c(0.001, 0.002, 0.003) To make readability easier the model with best learning rate is used. 
 
@@ -403,7 +405,12 @@ model %>% fit(x_train, y_train, epochs = 10, batch_size = 32, validation_data = 
 ) %>% plot()
 
 model %>% evaluate(x_test, y_test, batch_size=32, verbose = 1) #0.5811648
+
+#Test and Train Accuracies
+(test_accuracy_wordcount_smaller = model %>% evaluate(x_test, y_test, batch_size=32, verbose = 1)) #0.5811648
 #This smaller model gave a better accuracy result than the one that has no dropout 
+
+(train_accuracy_wordcount_smaller = model %>% evaluate(x_train, y_train, batch_size=32, verbose = 1))
 
 #Get the predictions for the model
 predictions <- model %>% predict(x_test)
@@ -444,8 +451,9 @@ prob_b = (t[7,1]*t[1,4]) + (t[7,2]*t[2,4]) +(t[7,3]*t[3,4])
 
 k = (prob_a - prob_b)/(1-prob_b)
 
-paste0("Kappa value is ", round(k, 3), ", and this means the results have no agreement!")
+paste0("Kappa value is ", round(k, 3), ", and this means we are doing better than random")
 
+# Kappa value tells you how much better your classifier is performing over the performance of a classifier that simply guesses at random according to the frequency of each class.
 ```
 
 The accuracy is slightly better than bigger model with no-dropouts (0.581%)
@@ -536,8 +544,12 @@ model %>%
 model %>% fit(x_train, y_train, epochs = 10, batch_size = 32, validation_data = list(x_test, y_test)
 ) %>% plot()
 
-model %>% evaluate(x_test, y_test, batch_size=32, verbose = 1) #0.6146221 accuracy rate
 
+#Test and Training Accuracies
+(train_accuracy_tfidf = model %>% evaluate(x_train, y_train))$acc
+(test_accuracy_tfidf = model %>% evaluate(x_test, y_test))$acc #0.6146221 test accuracy
+
+#Get predictions
 predictions <- model %>% predict(x_test)
 predictions2 = model %>% predict_classes(x_test)
 range(predictions)
@@ -572,7 +584,8 @@ prob_b = (t[7,1]*t[1,4]) + (t[7,2]*t[2,4]) +(t[7,3]*t[3,4])
 
 k = (prob_a - prob_b)/(1-prob_b)
 
-paste0("Kappa value is ", round(k, 3), ", and this means the results have no agreement!")
+
+paste0("Kappa value is ", round(k, 3), ", and this means the results are better than a random classifier")
 
 ```
 The accuracy is 0.6158 and the model starts overfitting after fourth epoch. So this is slightly better than the bag of words word-count model as we expected.
@@ -636,10 +649,10 @@ model %>%
 
 model %>% fit(x_train, y_train, epochs = 20, batch_size = 32 ,validation_data = list(x_test, y_test)) %>% plot()
 
-#Test accuracy
-(accuracy_sentiment_test = (model %>% evaluate(x_test, y_test))$acc)
+#Test and Training Accuracies
+(test_accuracy_sentiment = (model %>% evaluate(x_test, y_test))$acc)
 #Training accuracy
-(accuracy_sentiment_train = (model %>% evaluate(x_train, y_train))$acc)
+(train_accuracy_sentiment = (model %>% evaluate(x_train, y_train))$acc)
 
 
 paste0("Accuracy of sentiment analysis is ", round(accuracy_sentiment,3))
@@ -662,24 +675,38 @@ pres.actual <- apply(y_test,1,which.max)
 pres.actual = as.data.frame(pres.actual, ncol=1)
 
 predictions_val <- cbind(test_sona, pres.actual, pres.max)
-predictions_val = predictions_val %>% select(prez, pres.actual, pres.max)
+predictions_val = predictions_val %>% select(president, pres.actual, pres.max)
 
 
-table <- table(predictions_val$pres.actual, predictions_val_2$pres.max)
+table <- table(predictions_val$pres.actual, predictions_val$pres.max)
 paste0("Accuracy rate is:" , round((sum(diag(t))/sum(t)),4))
+```
+## Cohen's Kappa
 
-# Calculate kappa by hand
-t = as.matrix(table)
-t = cbind(t, "4" = colSums(t)/sum(colSums(t)))
-t = rbind(t, "7" = rowSums(t)/sum(rowSums(t)))
-t[7,4] = 0
+'Cohen¢s kappa is always less than or equal to 1. Values of 0 or less, indicate that the classifier is useless. There is no standardized way to interpret its values. Landis and Koch (1977) provide a way to characterize values. According to their scheme a value < 0 is indicating no agreement , 0???0.20 as slight, 0.21???0.40 as fair, 0.41???0.60 as moderate, 0.61???0.80 as substantial, and 0.81???1 as almost perfect agreement.'
+[Reference: Landis, J.R.; Koch, G.G. (1977). ???The measurement of observer agreement for categorical data???. Biometrics 33 (1): 159???174]
 
-prob_a = sum(diag(table))/sum(colSums(table))
-prob_b = (t[7,1]*t[1,4]) + (t[7,2]*t[2,4]) +(t[7,3]*t[3,4])
+```{r}
+# # Calculate kappa by hand to see if it matches cohen.kappa() result.
+# t = as.matrix(table)
+# t = cbind(t, "4" = colSums(t)/sum(colSums(t)))
+# t = rbind(t, "7" = rowSums(t)/sum(rowSums(t)))
+# t[7,4] = 0
+# 
+# prob_a = sum(diag(table))/sum(colSums(table))
+# prob_b = (t[7,1]*t[1,4]) + (t[7,2]*t[2,4]) +(t[7,3]*t[3,4])
+# 
+# k = (prob_a - prob_b)/(1-prob_b)
+# 
+# paste0("Kappa value is ", round(k, 4), ", and the classifier is slightly better than random classifier") #0.1285
 
-k = (prob_a - prob_b)/(1-prob_b)
 
-paste0("Kappa value is ", round(k, 3), ", and this means the results have no agreement!")
+#As we have seen from the table above the nn did not predict anything for hte minority classes so we have to cbind zeros as 4th,5th,6th columns. Because we need a square matrix for calculating Cohen's Kappa when using cohen.kappa() function.
+
+table = cbind(table, "4" = rep(0, 6), "5" = rep(0, 6),"6" = rep(0, 6))
+library(psych)
+cohen.kappa(table)
+
 ```
 Sentiment analysis also reaches it's smallest validation loss value on the fifth iteration. But the train accuracy and test accuracy is changing very slightly at each iteration. This model does not seem to be doing well on eighter the training set or the test set. The test accuracy is 0.4361834 and the training accuracy is 0.4353395. If we look at the NRC sentiment lexicon it is visible that all presidents share same sentiment distribution pattern, so this is why it is not overfitting. Because our set aside test set is actually no different than the training set.
 
@@ -747,10 +774,10 @@ model %>%
 
 model %>% fit(x_train, y_train, epochs = 10, batch_size = 32, validation_data = list(x_test, y_test)) %>% plot()
 
-#Test Accuracy
-model %>% evaluate(x_test, y_test)
-#Training Accuracy
-model %>% evalueate(x_train, y_train)
+#Test and Training Accuracies
+(train_accuracy_topic = model %>% evaluate(x_train, y_train))$acc
+(test_accuracy_topic = model %>% evaluate(x_test, y_test))$acc
+
 
 #Get predictions
 predictions <- model %>% predict(x_test)
@@ -956,8 +983,9 @@ model %>% fit(
   validation_data = list(x_val, y_val)
 ) %>% plot()
 
-(test_accuracy_transferlearn = model %>% evaluate(x_val, y_val))
-(train_accuracy_transferlearn = model %>% evaluate(x_train, y_train))
+#Test and Training Accuracies
+(test_accuracy_transferlearn = model %>% evaluate(x_val, y_val))$acc
+(train_accuracy_transferlearn = model %>% evaluate(x_train, y_train))$acc
 
 #Getting the predictions:
 predictions <- model %>% predict(x_val)
@@ -984,16 +1012,25 @@ head(predictions_val %>% filter(president == "Motlanthe") %>% select(pres.max, p
 head(predictions_val %>% filter(president == "Ramaphosa") %>% select(pres.max, pres.actual)) #President numero 5
 head(predictions_val %>% filter(president == "deKlerk") %>% select(pres.max, pres.actual))#President numero 6
 
-(t = table(predictions_val$pres.max, predictions_val$pres.actual))
-paste0("President sentence counts:")
-(table(input_data$sentences$president))
+(t = table(pred = predictions_val$pres.max, actual = predictions_val$pres.actual))
+paste0("President sentence counts in validation set:")
+(table(sentence_data$validate$president))
 paste0("Baseline_accuracies")
 (baseline_accuracies = table(input_data$sentences$president)*100/sum(table(input_data$sentences$president)))
 ```
-Majority of the sentences of Mothlane(38/66) is predicted as Mandela,
-Majority of sentences of Ramaphosa is predicted as Mandela(19/47) or Zuma(15/47),
+Majority of the sentences of Mbeki is predicted as Mandela(379/569).
+Majority of the sentences of Zuma is predicted as Mandela (244/534) and the secon majority is predicted as himself (195/534).
+Majority of the sentences of Mandela is predicted as Mandela(263/381).
+Majority of the sentences of Mothlane(38/66) is predicted as Mandela.
+Majority of sentences of Ramaphosa is predicted as Mandela(19/47) or Zuma(15/47).
 Mojority of the sentences of deKlerk is predicted as Mandela(14/17).
 
+
+```{r}
+#Let's calculate Cohen's kappa for this model
+library(psych)
+cohen.kappa(t) #0.116 #We are doing slightly better than random classifier.
+```
 
 
 
@@ -1003,15 +1040,33 @@ Mojority of the sentences of deKlerk is predicted as Mandela(14/17).
 
 ```{r nn}
 
-# sam / merve?? I have actually done my predictions within chunks, so we can remove this part. Votes?
+# sam / merve?? 
+# merve says: I have actually done my predictions within chunks, so we can remove this part. Votes?
+
+paste0("Test accuracy for the bigger word-count model is ", test_accuracy_wordcount_bigger$acc) #0.55886
+paste0("Train accuracy for the bigger word-count model is ", train_accuracy_wordcount_bigger$acc)
+
+paste0("Test accuracy for the smaller word-count model is ", test_accuracy_wordcount_smaller$acc) #0.5811648
+paste0("Train accuracy for the smaller word-count model is ", train_accuracy_wordcount_smaller$acc)
+
+paste0("Test accuracy for the tf-idf model is ", test_accuracy_tfidf$acc) #0.6146221
+paste0("Train accuracy for the tf-idf model is ", train_accuracy_tfidf$acc)
+
+paste0("Test accuracy for the sentiment analysis nn is ", test_accuracy_sentiment$acc) #
+paste0("Train accuracy for the sentiment analysis nn is ", train_accuracy_sentiment$acc)
+
+paste0("Test accuracy for the topic modelling nn is ", test_accuracy_topic$acc) #
+paste0("Train accuracy for the topic modelling nn is ", train_accuracy_topic$acc)
+
+paste0("Test accuracy for the transfer learning CNN is ", test_accuracy_transferlearn$acc) #0.4634449
+paste0("Train accuracy for the transfer learning CNN is ", train_accuracy_transferlearn$acc)
+
 
 ```
 
-
-
 ### **Evaluate Out of Sample Performance**
 
-
+test_acc
 
 ## **Convolutional Neural Net (cnn) to predict the President from a Sentence**
 
@@ -1060,3 +1115,4 @@ https://keras.rstudio.com/articles/examples/pretrained_word_embeddings.html
 
 https://github.com/rstudio/keras/blob/master/vignettes/examples/pretrained_word_embeddings.R
 
+Landis, J.R.; Koch, G.G. (1977). ???The measurement of observer agreement for categorical data???. Biometrics 33 (1): 159???174
