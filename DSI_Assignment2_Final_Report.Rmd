@@ -1607,7 +1607,7 @@ One of the aims behind topic modelling is to reduce the dimensions of the data t
 
 The count of each word that have been used in each sentence is what we are going to be feeding in. We need to unnest the sentence data, count each word in each sentence and spread the sentence word counts so that we have sentence id's in each row and we have each word as column id's. This is the simplest neural net model that we can try, so that was our first model.
 
-```{r eval=FALSE}
+```{r train_accuracy_wordcount_bigger, eval=FALSE}
 #Unnest words and count
 president_word_count = input_data$sentences %>%
   group_by(president) %>%
@@ -1687,7 +1687,7 @@ load("mnn.RData")
 This model has L2 regularization to avoid overfitting but even so it didn't help very much. The accuracy is 0.55886. The optimizer_rmsprop has learning rate 0.003. This was choosen after trying lr=c(0.001, 0.002, 0.003) To make readability easier the model with best learning rate is used. 
 
 As we can see from the plot model overfits after the second iteration, since the loss function start increasing in value, so to avoid that let's use a smaller model with less neurons and add a dropout.
-```{r eval=FALSE}
+```{r table_bow, eval=FALSE}
 model <- keras_model_sequential() #Creating an empty sequential model
 
 #Define a model by sequentially adding layers. Add a simple model so it does not overfit.
@@ -1753,6 +1753,8 @@ head(predictions_val %>% filter(prez == "deKlerk") %>% select(pres.max, pres.act
 table_bow <- table(actual = predictions_val$pres.actual, pred = predictions_val$pres.max)
 paste0("Accuracy rate is:" ,round((sum(diag(table_bow))/sum(table_bow)),4))
 ```
+![Figure: Bag of words model - neural net training](images/test_accuracy_wordcount_smaller.png)
+
 `r table_bow`
 
 Accuracy rate is: `r round((sum(diag(table_bow))/sum(table_bow)),4)`.
@@ -1893,6 +1895,13 @@ head(predictions_val %>% filter(prez == "deKlerk") %>% select(pres.max, pres.act
 table_tfidf <- table(predictions_val$pres.actual, predictions_val$pres.max)
 paste0("Accuracy rate is:" , round((sum(diag(t))/sum(t)),4))
 ```
+```{r}
+kable(table_tfidf)
+```
+![Figure: Bag of words model - neural net training](images/test_accuracy_wordcount_smaller.png)
+
+Accuracy rate is: `r round((sum(diag(table_tfidf))/sum(table_tfidf)),4)`.
+
 #### **Cohen's Kappa**
 ```{r eval=FALSE}
 table_tfidf = cbind(table_tfidf, "4" = rep(0, 6), "5" = rep(0, 6),"6" = rep(0, 6))#make it square
@@ -1966,7 +1975,7 @@ model %>% fit(x_train, y_train, epochs = 20, batch_size = 32 ,validation_data = 
 (train_accuracy_sentiment = (model %>% evaluate(x_train, y_train))$acc)
 
 
-paste0("Accuracy of sentiment analysis is ", round(accuracy_sentiment,3))
+paste0("Accuracy of sentiment analysis is ", round(test_accuracy_sentiment,3))
 
 #Get the predictions
 predictions <- model %>% predict(x_test)
@@ -1992,23 +2001,30 @@ predictions_val %>% filter(president == "Mandela") %>% select(pres.actual, pres.
 (predictions_val %>% select(president, pres.actual) %>% unique %>% arrange(-desc(pres.actual)))
 
 (table_sentiment <- table(actual = predictions_val$pres.actual, pred = predictions_val$pres.max))
-paste0("Accuracy rate is:" , round((sum(diag(t))/sum(t)),4))
+paste0("Accuracy rate is:" , round((sum(diag(table_sentiment))/sum(table_sentiment)),4))
 
 ```
+```{r}
+kable(table_sentiment)
+```
+
+![Figure: Bag of words model - neural net training](images/test_accuracy_sentiment.png)
+
+Accuracy of sentiment analysis is: `r round(test_accuracy_sentiment,3)` [`r  round((sum(diag(table_sentiment))/sum(table_sentiment)),4)`].
 
 
 #### **Cohen's Kappa**
 
 ```{r eval=FALSE}
 
-table_sentiment = cbind(table_sentiment,"3"=rep(0,6), "4" = rep(0, 6), "5" = rep(0, 6),"6" = rep(0, 6))
+#table_sentiment = cbind(table_sentiment,"3"=rep(0,6), "4" = rep(0, 6), "5" = rep(0, 6),"6" = rep(0, 6))
 cohen.kappa(table_sentiment)[1]
 
 ```
 Sentiment analysis also reaches it's smallest validation loss value on the fifth iteration. But the train accuracy and test accuracy is changing very slightly at each iteration. This model does not seem to be doing well on eighter the training set or the test set. The test accuracy is 0.4361834 and the training accuracy is 0.4353395. If we look at the NRC sentiment lexicon it is visible that all presidents share same sentiment distribution pattern, so this is why it is not overfitting. Because our set aside test set is actually no different than the training set.
 
 ### **Neural Nets with Topic Modelling Data (Gamma Values)**
-```{r eval=FALSE}
+```{r topicnn, eval=FALSE}
 #The preparation of this topic_matrix can be found in the 
 load("vanessa/topic_matrix.RData")
 
@@ -2101,6 +2117,8 @@ paste0("Accuracy rate is:" , round((sum(diag(t))/sum(t)),4))
 ```
 Topic modelling only predicted for president 1(Mbeki) and president 2(Zuma).
 
+![Figure: Bag of words model - neural net training](images/test_accuracy_topic.png)
+
 #### **Cohen's Kappa**
 ```{r eval=FALSE}
 
@@ -2130,9 +2148,9 @@ Also for the pre-trained embeddings to work well it needs to be trained with sim
 
 ```{r eval=FALSE}
 #Load the data we are going to be embedding
-load("~/Downloads/dsi-assign2/input_data.RData")
-load("~/Downloads/dsi-assign2/balanced_train_data.RData")
-load("~/Downloads/dsi-assign2/sentence_data.RData")
+load("input_data.RData")
+load("balanced_train_data.RData")
+load("sentence_data.RData")
 
 #Settings for gloves embedding
 GLOVE_DIR <- 'glove.6B'
@@ -2152,7 +2170,7 @@ download_data <- function(data_dir, url_path, data_file) {
     unlink(data_file)
   }
 }
-download_data(GLOVE_DIR, 'http://nlp.stanford.edu/data/', 'glove.6B.zip')
+#download_data(GLOVE_DIR, 'http://nlp.stanford.edu/data/', 'glove.6B.zip')
 
 # first, build index mapping words in the embeddings set
 # to their embedding vector
