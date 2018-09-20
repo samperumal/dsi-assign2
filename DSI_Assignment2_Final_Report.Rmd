@@ -776,6 +776,92 @@ The positive most used words which are also associated with the "anticipation", 
 
 The most usedwords that evoke the "trust" emotion are: "system", "president", "parliament" and "nation".  
 
+## Analysis of Sentiment using Bigrams
+
+### Checking for Negation in Bigrams
+
+It just so happens that the 4 negation words are also stop words so have already been removed from the Bigrams and we need to add them back. This can be shown as follows:
+
+```{r}
+
+negation_words <- c("not", "no", "never", "without")
+
+x <- which(stop_words$word == "not")      # this includes the pattern for "not"
+x <- append(x, which(stop_words$word == "no"), after=length(x))
+x <- append(x, which(stop_words$word == "never"), after=length(x))
+x <- append(x, which(stop_words$word == "without"), after=length(x))
+stop_words$word[x]
+
+```
+
+Let's redo the bigrams without removing stop words and see how many bigrams contain 1 of the negation words:
+
+```{r negation}
+
+# start with the bigrams including stop words
+bigrams_negation <- tidy_sona_sentences %>% 
+  unnest_tokens(bigram, sentence, token = "ngrams", n = 2) %>% 
+  # separate the bigrams
+  separate(bigram, c("word1", "word2"), sep = " ") %>% 
+  # add sentiment for word 1
+  left_join(get_sentiments("bing"), by = c(word1 = "word")) %>%
+  rename(sentiment1 = sentiment) %>%
+  mutate(sentiment1 = ifelse(is.na(sentiment1), "neutral", sentiment1)) %>%
+  # add sentiment for word 2
+  left_join(get_sentiments("bing"), by = c(word2 = "word")) %>%
+  rename(sentiment2 = sentiment) %>%
+  mutate(sentiment2 = ifelse(is.na(sentiment2), "neutral", sentiment2)) %>%
+  select(year,word1,word2,sentiment1,sentiment2,everything())
+
+# let's see how many there are
+filter(bigrams_negation, word1 %in% negation_words) %>% 
+  filter(sentiment2 != "neutral") %>%    # we are not interested in these
+  count()
+
+```
+
+There are only 118 bigrams that contain negation words. Let's look at a few examples:
+
+```{r}
+
+# let's look at a few examples per president
+filter(bigrams_negation, word1 %in% negation_words) %>% 
+  filter(sentiment2 != "neutral") %>%    # we are not interested in these
+  group_by(president) %>% 
+  top_n(5) %>% 
+  select(-election, -id) %>% 
+  kable("html", escape = FALSE, align = "r", caption = "bing Sentiment of Bigrams") %>%
+  kable_styling(bootstrap_options = 
+                  c("striped", "condensed", "bordered"), 
+                  full_width = FALSE)
+
+```
+
+Let's see how many there are per president:
+
+```{r}
+
+# total bigrams excluding stopwords
+president_totalbigrams <- tidy_sona_bigrams %>% 
+  group_by(president) %>% 
+  count() %>% 
+  rename(total = n)
+
+filter(bigrams_negation, word1 %in% negation_words) %>% 
+  filter(sentiment2 != "neutral") %>%    # we are not interested in these
+  group_by(president) %>% 
+  count() %>% 
+  left_join(president_totalbigrams) %>% 
+  mutate(perc = round(n/total*100,2)) %>% 
+  kable("html", escape = FALSE, align = "r", caption = "Percentage of Bigrams with Negation Words") %>%
+  kable_styling(bootstrap_options = 
+                  c("striped", "condensed", "bordered"), 
+                  full_width = FALSE)
+
+```
+
+Given that there is such a low percentage of bigrams with negation words, it is not expected to significantly change the interpretation above and recoding the sentiments is not justified.
+
 # Topic Modelling
 
 An effective topic model can summarise the ideas and concepts within a document - this can be used in various ways.  A user can understand the main themes within the corpus of documents and draw conclusions from these from analysis of these topics or they can use the information as type of dimensional reduction and feed these topics into different supervised or unsupervised algorithms.
@@ -787,7 +873,7 @@ In this project, our group has used topic modelling to better understand the com
 The data used in this section is the clean and processed data as described in Section X.  The resulting sentence data has been used and dissected further without consideration to train and validation unless otherwise stated. 
 
 
-### Methodology
+## Methodology
 
 The following methodology was followed:
 
