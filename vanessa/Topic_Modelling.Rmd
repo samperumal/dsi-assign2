@@ -6,7 +6,7 @@ output:
 always_allow_html: yes
 ---
 
-```{r global_options, include=FALSE, warning=FALSE}
+```{r global_options, include=FALSE, warning=FALSE, eval=FALSE}
 knitr::opts_chunk$set(fig.width=8, fig.height=5, fig.path='Figs/',
                       echo=TRUE, warning=FALSE, message=FALSE, fig.align = "center" )
 ```
@@ -100,6 +100,10 @@ ggplot(aes(bigram, count_bigram)) +
 
 ```
 
+
+![Figure: Most popular terms](images/terms.png)
+
+
 After tokenisation and removal of stop words, the top 20 most used terms across all of the SONA speeches are displayed.  Unsurprisingly, "South Africa" is the most used term followed closely by "South African" and "South Africans" and "Local Government".  These terms do not add to our understanding of the topics and tend to confuse the topic modelling going forward.  The removal of the terms allows for a cleaner interpretation.  "Public service is then the most used term.
 
 
@@ -185,6 +189,8 @@ FindTopicsNumber_plot(result)
 
 ```
 
+![Figure: Optimisation Metrics](images/Optimisation.png)
+
 From the above plot, the marginal benefit from adding another topic, stops at around 8-10 topics.  In order to test this, the *"perplexity"* over a test sample for the document term matrix can be checked.
 
 ```{r, warning=FALSE}
@@ -215,6 +221,8 @@ g <- g + geom_line(aes(y=test), colour="red")
 g <- g + geom_line(aes(y=train), colour="blue")
 g 
 ```
+
+![Figure: Perplexity Plot](images/perplexity.png)
 
 As more topics are used, the perplexity of the training sample does decrease but that of the test sample increases from around 11 topic.  The perplexity of the test sample seems to be minimised at around 8 topics.  
 
@@ -330,7 +338,8 @@ wordcloud.1
 
 ```
 
-
+![Figure: Popular terms in Topic 1](images/topic1.png)
+![Figure: WordCloud for Topic1](images/wordcloud1.png)
 
 #####Topic Two
 
@@ -389,7 +398,8 @@ wordcloud.2
 
 
 ```
-
+![Figure: Popular terms in Topic 2](images/topic2.png)
+![Figure: WordCloud for Topic 2](images/wordcloud2.png)
 
 #####Topic Three
 
