@@ -1,7 +1,8 @@
 ---
-title: "Data Analysis"
+title: "Data Science for Industry - Assignment 2"
+authors: "Vanessa Saker, Audrey Pentz, Merve Aydin, Sameshan Perumal"
+date: "20 September 2018"
 output: html_document
-  #html_document: default
 ---
 
 
@@ -12,7 +13,7 @@ output: html_document
 ##---------------------------------##
 
 knitr::opts_chunk$set(
-  echo = FALSE, eval = TRUE
+  echo = FALSE, eval = TRUE, warning = FALSE
 )
 
 suppressPackageStartupMessages({
@@ -42,38 +43,38 @@ load("vanessa/topic_matrix.RData")
 ```
 
 
-#### **Description of the Problem**
+# Description of the Problem
 
 We were given 30 State of the Nation (SONA) speeches from 1994 to 2018 to analyse. The specific objectives are to: 
-1. Infer sentiment and changes in sentiment over time  
-2. Describe the topics that emerge  
-3. Predict the President from a given sentence of text  
-4. Evaluate out of sample performance of the predictions  
+
+ 1. Infer sentiment and changes in sentiment over time  
+ 2. Describe the topics that emerge  
+ 3. Predict the President from a given sentence of text  
+ 4. Evaluate an out of sample performance of the predictions  
 
 
-#### **Approach**  
+# Approach
 
 We collaborated using the following GitHub location: **https://github.com/samperumal/dsi-assign2**. 
 
 We initially split the work as follows and each of us created a folder with our names to push our work to for others to view:  
-- Neural Net - Sam and Merve
-- Bag of Words - Merve
-- Topic Modelling - Vanessa
-- Sentiment Analysis - Audrey
 
-We presented our work to each other and made suggestions for improvement. Before diving into any prediction, we felt it is important to do an Exploratory Data Analysis (EDA) to get a sense of the high level overview of the dataset. This was done by Audrey.
+ * Neural Net - Sam and Merve
+ * Bag of Words - Merve
+ * Topic Modelling - Vanessa
+ * Sentiment Analysis - Audrey
 
-The initial results from the Neural Net gave a 65% accuracy on the validation set and we wanted to feed the results of the Topic Modelling and Sentiment Analysis into the Neural Net to see if it would improve results so we needed to understand from each other what the output of these 2 methods was and the input required by the neural net to get the data into a useable format which took some discussion and a few iterations.
+We presented our work to each other and made suggestions for improvement. Before diving into any prediction, we felt it was important to do an Exploratory Data Analysis (EDA) to get a sense of the high level overview of the dataset. This was done by Audrey.
 
-Given the low accuracy of the neural net (NN), we also tried a Convolutional Neural Net (CNN). Sam got the initial model working. Merve made improvements. Vanessa tuned the hyperparamters.
-...need more here...
+The initial results from the Neural Net gave a 65% accuracy on the validation set. In order to  achieve a higher accuracy, we attempted to feed the results of the Topic Modelling and Sentiment Analysis into the Neural Net. Thus, we needed to understand from each other what the output of these 2 methods were and the input required by the neural net to get the data into a useable format which took some discussion and a few iterations.
 
-The cnn did not provide much improvement over the NN so we also tried a Recurrent Neural Net (RNN) which takes in sequences of data so the order of the words is also taken into account in the model.
-...need more here...
+Given the low accuracy of the neural net (NN), we tried a Convolutional Neural Net (CNN). Sam got the initial model working. Merve made improvements. Vanessa tuned the hyperparamters. The result is discussed in this document and is a collaborative effort.
 
-#### Data Preparation
+The CNN did not provide an improvement over the initial NN, and as a result we tried a Recurrent Neural Net (RNN). This takes ina sequence of data and gives importance to the order of the words in order to make a prediction.
 
-Initially we each performed our own import of the data, splitting out the year and president and tokenisation but we realised there was duplication of effort here and different naming conventions which made it difficult to collaborate and use each other's output. In addition, Sam noticed that some of the data was not being read in because of special characters and sentences were not being tokenised correctly for various reasons so he became responsible for performing the data clean up (preprocessing) and outputting a .RData file that we could all then use to rerun our work. 
+# Data Preparation
+
+Initially we each performed our own import of the data, splitting out the year and president and tokenisation but we realised there was duplication of effort here and different naming conventions which made it difficult to collaborate and use each other's output. In addition, Sam noticed that some of the data was not loaded due to special characters. Sentences were not being tokenised correctly for various reasons and he became responsible for performing the data clean up (preprocessing) and outputting a .RData file that everyone could use to run our work. 
 
 The data as provided consisted of 30 text files, with filenames encoding the president's name, the year of the speech, and whether it was pre/post an election (which is absent in non-election years). In working through the files, we discovered that two files were identical which was corrected in the data source with replacement. Additionally, in reading the files, we also identified 3 files that had one or more bytes which caused issues with the standard R file IO routines. Specifically 1 file had a leading Byte-Order-Mark (BOM) which is unique to windows operating system files, and 2 other files had invalid unicode characters, which suggests a text-to-speech processing application was used and experienced either transmissionor storage errors. In all the cases the offending characters were simply removed from the input files. 
 
@@ -89,17 +90,17 @@ Having fixed basic read issues, we then examined the content of each file and th
  
  * Specific punctuation (ellipsis, colon, semi-colon) was considered equivalent to a sentence separator and converted to a full stop: **:;…¦...**.
  
- * Full stops separated by only whitespace were considered redundany and collapsed to a single whitespace character.
+ * Full stops separated by only whitespace were considered redundancy and collapsed to a single whitespace character.
   
  * All contiguous whitespace was collapsed to a single whitespace character.
  
  * The *unnest_tokens* function relies on each new sentence starting with a capital letter. After the above fixes, it was was therefore necessary to capitalise every character after full stop, to ensure it is recognised as the start of a new sentence.
  
-Having fixed the text to allow correct sentence tokenisation, and applied the *unnest_tokens* function, we then determined a unique ID for each sentence by applying a hash digest function to the sentence text. This unique ID allowed everyone to work on the same data with confidence, and also enabled us to detect 72 sentences that appeared identically in at least 2 speeches. As these duplicates would potentially bias the analysis and training, all instances of duplicates were removed from the dataset.
+Having fixed the text to allow correct sentence tokenisation, and applied the *unnest_tokens* function, we then determined a unique ID for each sentence by applying a hash digest function to the sentence text. This unique ID allowed everyone to work on the same data with confidence, and enabled us to detect 72 sentences that appeared identically in at least 2 speeches. As these duplicates would potentially bias the analysis and training, all instances of duplicates were removed from the dataset.
   
 One final note is that each speech starts with a very similar boiler plate referencing various attendees to the SONA in a single, run-on sentence. We believe this header does not add significantly to the content of the speech, and so we excluded all instances across all speeches.
 
-```{r fig.cap="Change in number of sentences per president before and after filtering.", eval=TRUE}
+```{r fig.cap, eval=TRUE}
 comparison_data_set = bind_rows(
   input_data$sentences %>% mutate(processing = +1), 
   input_data$unfiltered_sentences %>% mutate(processing = -1)
@@ -120,38 +121,39 @@ changed_data_set %>% ggplot() + geom_col(aes(x = year, y = change, fill = Presid
 ```
 
 The figure above shows the change in number of sentences per president after filtering. On the whole there are more sentences per president, with only a single reduction. Additionally, the highest increases are associated with the files where read-errors prevented us from previously reading the entire file. This change is equally evident in the boxplots below, which show the change in distribution per president of words and characters per sentence. 
+
 ```{r eval=TRUE}
 merged_sentences = bind_rows(input_data$sentences %>% mutate(filter = "Filtered"), input_data$unfiltered_sentences %>% mutate(filter = "Unfiltered"))
 
-merged_sentences %>% mutate(slen = str_length(sentence)) %>% ggplot(aes(x = president, y = slen, colour = president)) + geom_boxplot() + facet_grid(cols = vars(filter)) + xlab("President") + ylab("Sentence length in characters")
+merged_sentences %>% mutate(slen = str_length(sentence)) %>% ggplot(aes(x = president, y = slen, colour = president)) + geom_boxplot() + facet_grid(cols = vars(filter)) + xlab("President") + ylab("Sentence length in characters")+ theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5)) + ggtitle("Variance in sentence length in words per President") 
 ```
 
 ```{r eval=TRUE}
 merged_words = bind_rows(input_data$words %>% mutate(filter = "Filtered"), input_data$unfiltered_words %>% mutate(filter = "Unfiltered"))
 
-merged_words %>% group_by(president, filter, id) %>% summarise(n = n()) %>% select(president, filter, n) %>% ggplot(aes(x = president, y = n, colour = president)) + geom_boxplot() + facet_grid(cols = vars(filter)) + xlab("President") + ylab("Sentence length in words")
+merged_words %>% group_by(president, filter, id) %>% summarise(n = n()) %>% select(president, filter, n) %>% ggplot(aes(x = president, y = n, colour = president)) + geom_boxplot() + facet_grid(cols = vars(filter)) + xlab("President") + ylab("Sentence length in words") + theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5))  + ggtitle("Variance in sentence length in characters per President")
 ```
 
-Overall there is a much tighter grouping of sentences, with less variation and more conistent lengths, which is useful for techniques which depend on equal length inputs. The final histogram below shows the histogram of number of sentences per year/president after filtering, which still bears the same basic shape as before filtering, but with a better profile.
+Overall there is a much tighter grouping of sentences, with less variation and more conistent lengths, which is useful for techniques which depend on equal length inputs, such as some of the Neural Networks. The final histogram below shows the histogram of number of sentences per year/president after filtering, which still bears the same basic shape as before filtering, but with a better profile.
 
 ```{r eval=TRUE}
 grouped_data_set %>% 
   filter(processing == 1) %>% 
-  ggplot() + geom_col(aes(x = year, y = count, fill = President)) + theme(axis.text.x=element_text(angle = 90,hjust = 1,vjust = 0.5)) + ylab("Number of sentences") + xlab("Year") 
+  ggplot() + geom_col(aes(x = year, y = count, fill = President)) + theme(axis.text.x=element_text(angle = 90,hjust = 1,vjust = 0.5)) + ylab("Number of sentences") + xlab("Year") + theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5))  + ggtitle("Total number of sentences per President per year")
 
 ```
 
-#### Data Split and Sampling
+## Data Split and Sampling
 
-For all group work, we separated our full dataset into a random sampling of 80% training and 20% validation data, which was saved into a common .RData file. This ensured that there would be consistency across the data we were working on so that we could use each others work and compare results more easily.
+For all group work, we separated our full dataset into a random sampling of 80% training and 20% validation data, which was saved into a common .RData file. This ensured that there would be consistency across the data we were working on so that we could use each others work and compare results consistently.
 
-The graphs above make it clear that our data is also very unbalanced. In an attempt to correct for this, we applied supersampling with replacement to the training dataset to ensure an equal number of sentences per president. Training was attempted using both balanced and unbalanced training data, but it did not appear to make much difference. Balancing was conducted on the training dataset only to ensure 
-there are no duplicates in the validation set that might skew validation error.
+The graphs above make it clear that our data is also very unbalanced. In an attempt to correct for this, we applied supersampling with replacement to the training dataset to ensure an equal number of sentences per president. Training was attempted using both balanced and unbalanced training data, but it did not appear to make much difference. Balancing was conducted on the training dataset only to ensure there are no duplicates in the validation set that might skew validation error.
 
 
-#### **Overview of the dataset**  
+# Overview of the dataset
 
 Each president has made a certain number of SONA speeches, depending on their term in office and whether there was 1 speech that year or 2 in the year of an election (pre and post election). Since the data is dependent on their term in the office it is unbalanced. Sentence counts per president after cleaning the data is :
+
 ```{r eval=TRUE}
 paste0("President sentence counts:")
 (table(input_data$sentences$president))
@@ -160,9 +162,9 @@ paste0("Baseline_accuracies")
 
 #Since the baseline accuracies as given above, as very unbalanced, it is expected that the majority classes will be predicted over the minority.
 ```
-Let's understand the number of words used by each President and how this varies across each SONA speech. 
+Let us understand the number of words used by each President and how this varies across each SONA speech. 
 
-#### **Average number of words used per President**  
+## Average number of words used per President
 
 We need to create a metric called "avg_words" which is simply the total number of words across all SONA speeches made by a particular president, divided by the total number of SONA speeches that president made.  
 
@@ -215,11 +217,9 @@ avg_word_count %>%
 
 ```
   
-## **Insights:**   
-
 On average, Mbeki used the most words in his SONA speeches, followed by Motlanthe and de Klerk used the least. Mandela and Zuma are ranked in the middle of their peers. The current president (Ramaphosa) used fewer words than all of his post 1994 peers.  
 
-#### **Number of words used per SONA**  
+## Number of words used per SONA
 
 ```{r descSONA, eval=TRUE}
 
@@ -237,13 +237,9 @@ word_count %>%
 
 ```
   
-## **Insights:**   
-
 Of the 3 presidents that have made more than 1 SONA speech, Mbeki used more words on average than both Mandela and Zuma and the variance in the number of words used per SONA speech is also higher for Mbeki. In 2004, which was an election year, the average number of words Mbeki used was lower in both his pre- and post-election speeches. Towards the end of his term, his average number of words also dropped off. The data suggests that perhaps Mbeki's average number of words is correlated with his confidence in being re-elected President.  
 
-
-
-#### **Common words used across all SONA speeches**  
+## Common words used across all SONA speeches
 
 ```{r}
 
@@ -255,12 +251,7 @@ wordcloud2(word_count[1:300, ], size = .6, color='random-dark')
 
 ```
   
-## **Insights:**   
-
-....  
-
-
-#### **Common bigrams used across all SONA speeches**  
+## Common bigrams used across all SONA speeches
 
 ```{r}
 
@@ -271,18 +262,12 @@ bigram_count <- tidy_sona_bigrams %>%
 wordcloud2(bigram_count[1:300, ], size = .8, color='random-dark')
 
 ```
-  
-## **Insights:**   
 
-....
-
-
-
-#### **Lexical Diversity per President**  
+## Lexical Diversity per President
 
 Lexical diversity refers to the number of unique words used in each SONA.
 
-```{r diversity, eval=TRUE}
+```{r diversity, eval=TRUE, warning=FALSE}
 
 # word tokenization
 diversity_per_year <- input_data$words %>%   # don't remove stop words this time
@@ -303,17 +288,13 @@ diversity_per_year %>%
 
 ```
   
-## **Insights:**   
+The number of unique words per SONA ranges from about 700 for de Klerk in 1994 to over 2500 with Mandela in his post election speech of 1999. Mbeki's post election speech of 2004 and Zuma's post election speech of 2014 reached close to the 2500 mark.
 
-The number of unique words per SONA ranges from about 700 with de Klerk in 1994 to over 2500 with Mandela in his post election speech of 1999. Mbeki's post election speech of 2004 and Zuma's post election speech of 2014 also got close to the 2500 mark.  
-
-It's interesting that whilst the trend in the number of unique words used was most often upwards with Mandela, Mbeki and Zuma both show a mostly upward trend in the lead up to the election year, followed by a mostly downward trend after nearing the 2500 unique words mark in their post election speech.  
+It's interesting that whilst the trend in the number of unique words used increased for Mandela, Mbeki and Zuma both show a upward trend in the lead up to the election year, followed by a downward trend after elections, despite nearing the 2500 unique words mark in their post election speeches.
 
 If we exclude the post election speeches, the number of unique words used by Mbeki during his term from 2000 to 2008 averages just under 2000 whereas the number of unique words used by Zuma during his term from 2009 to 2017 averages just over 1500.  
 
-
-
-#### **Lexical Density per President**  
+## Lexical Density per President
 
 Lexical density refers to the number of unique words used in each SONA divided by the total number of words and a high value is an indicator of word repitition.  
 
@@ -338,26 +319,15 @@ density_per_year %>%
 
 ```
   
-## **Insights:**   
-
 De Klerk repeated over 30% of his words in his 1994 pre election SONA speech. On average, Mandela repeated about 25% of words in each of his SONA speeches and this reduced to about 20% in the post election speech of 1999. Mbeki's repitition rate was about 23% and this reduced to 20% in the post election speech of 2004. Zuma's repitition rate is over 30% with the exception of his post election speech of 2014 at about 23%.  
 
+# Sentiment Analysis
 
+## Bing Lexicon Results
 
-# **Results**
-
-
-
-
-#### **Sentiment Analysis**
-
-##### **Analysis of Sentiment using Single Words**
-
-##### **Sentiment Analysis using "bing" lexicon**  
-  
 The "bing" lexicon encodes words as either "positive" or "negative". However, not all words used in the SONA speeches are in the lexicon so we need to adjust for this.
   
-##### **Sentiment per President**   
+### Sentiment per President
   
 Let's understand how many "positive" and "negative" words are used by each president across all their SONA speeches and create a metric called "sentiment" which is simply the total number of positive words minus the total number of negative words. We then adjust for the total number of words used from the lexicon in the "sentiment_score" metric.  
   
@@ -384,13 +354,11 @@ avg_sentiment %>%
 
 ```
    
-**Insights:**   
-  
 Of the 3 presidents that have made more than 1 SONA speech, Zuma has the highest sentiment score, followed by Mbeki and then Mandela. Zuma's sentiment score is nearly double Mandela's. It's interesting that the current President, Ramaphosa, has the second highest sentiment score, not far behind Zuma and only slightly ahead of Mbeki.
 
 
   
-##### **What are the 10 positive words most frequently used by each president?**
+### What are the 10 positive words most frequently used by each president?
   
 ```{r  eval=TRUE}
 
@@ -421,13 +389,9 @@ positive_words %>%
 
 ```
   
-## **Insights:**   
-  
-De Klerk's most used words were "freedom", "peaceful" and "support" and at least 2 of these 3 come up in all the president's most used words. Mandela's most used words also include "progress", "improve", "reconciliation" and "commitment" which are all words indicating repair and a move towards something better. Mbeki uses many of the same words but also introduces "empowerment" which is a word carried through by Zuma and Ramaphosa and "success" which is carried through by Zuma. These words suggest progress in the move towards repair or something better, first spoken about by Mandela. Ramaphosa also introduces the words "confidence", "effectively", "enhance" and "efficient", which are words commonly seen in a business context and have not shown up in any other SA president's top 10 most frequently used words in a SONA since 1994.  
+De Klerk's most used words were "freedom", "peaceful" and "support" and at least 2 of these 3 come up in all the president's most used words. Mandela's most used words include "progress", "improve", "reconciliation" and "commitment" which are all words indicating repair and a move towards something better. Mbeki uses many of the same words but also introduces "empowerment" which is a word carried through by Zuma and Ramaphosa, and "success" which is carried through by Zuma. This is likely due to the fact that Black Economic Empowerment (BEE) was introduced under Mbeki and was a policy carried through by Zuma and Ramaphosa. In addition, these words suggest progress in the move towards repair or something better, first spoken about by Mandela. Ramaphosa also introduces the words "confidence", "effectively", "enhance" and "efficient", which are words commonly seen in a business context and have not shown up in any other SA president's top 10 most frequently used words in a SONA since 1994.  
 
-
-  
-##### **Which of the positive words most frequently used are common across presidents?**
+### Which of the positive words most frequently used are common across presidents?
   
 ```{r eval=TRUE}
 
@@ -453,13 +417,9 @@ tidy_sona_words %>%
 
 ```
   
-## **Insights:**    
-  
 Common positive words across post 1994 presidents include: "freedom", "regard", "support", "improve" and "progress". Words introduced by Mandela and unique to his speeches are: "restructuring", "reconciliation", "committment", "contribution" and "succeed". Mbeki introduces the words "empowerment", "comprehensive", "integrated" and "improving" into the top words used and this is unique to his speeches. Zuma uses the words "success", "reform" and "pleased" frequently and other presidents do not. Ramaphosa introduces the words "significant", "productive", "confidence" and "effectively" which have not yet been seen in the any other SA president's top 10 most frequently used words in a SONA since 1994.  
 
-
-
-##### **What are the 10 negative words most used by each president?**  
+### What are the 10 negative words most used by each president?
 
 ```{r negative, eval=TRUE}
 
@@ -490,8 +450,6 @@ negative_words %>%
 
 ```
   
-## **Insights:**   
-  
 Common negative words pre 1994 include: "concerns"/"concern"/"concerned", "unconstitutional", "illusion", "hopeless", "disagree", "deprive", "conflict", and "boycott".
 
 Common negative words post 1994 include: "corruption", "crime"/"criminal", "poverty"/"poor", "inequality", "issue"/"issues" and "crisis".
@@ -500,9 +458,7 @@ A negative word introduced by and unique to Mandela's top 10 is "struggle".
 Mbeki is the only president with the word "racism" in his top 10 negative words.
 Motlanthe has "conflict" in his top 10 which no other president does. Zuma has "rail" which likely refers to the railway system and does have negative connotations for South Africa. Both Zuma and Ramaphosa use the word "difficult" a lot. Ramaphosa introduces the word "expropriation" into the top 10 for the first time amongst his peers.
 
-
-
-##### **How many of the negative words most used were used by each president?**  
+### How many of the negative words most used were used by each president?
     
 ```{r  eval=TRUE}
 
@@ -524,13 +480,9 @@ tidy_sona_words %>%
   
 ```
   
-## **Insights:**   
-  
 The interpretation is much the same as before. Note the clear separation between the top 10 negative words used pre and post 1994 elections, indicative of the pre and post apartheid regimes.
 
-
-
-##### **What proportion of words used are positive vs negative?**
+### What proportion of words used are positive vs negative?
 
 ```{r eval=TRUE}
 
@@ -553,13 +505,9 @@ ggplot(filter(sentiments_relative), aes(x = year, y = freq, fill = sentiment)) +
 
 ```
   
-## **Insights:**   
-  
-The 2 vertical black lines are drawn at 60% amd 70% positivity rates. In the majority of years, SONA speeches fall within this range of positivity however a there are a few more negative speeches in earlier years and a few more positive speeches in later years.
+The 2 vertical black lines are drawn at 60% and 70% positivity rates. In the majority of years, SONA speeches fall within this range of positivity however a there are a few more negative speeches in earlier years and a few more positive speeches in later years.
 
-
-
-##### **Change in Sentiment over time**
+## Change in Sentiment over time
 
 ```{r eval=TRUE}
 
@@ -573,14 +521,11 @@ sentiments_relative %>%
 
 ```
   
-## **Insights:**    
-  
 The trend appears to be more positive and less negative over time but how can we be sure?
 
 We will test whether negative sentiment is increasing or decreasing, then we will test whether positive sentment is increasing or decreasing . We will use a Binomial model because the frequencies are between 0 and 1. Finally, we will test whether average sentiment is increasing or decreasing using a linear model.  
 
-
-##### **Is negative sentiment increasing over time?**
+### Is negative sentiment increasing over time?
 
 ```{r modelneg, eval=TRUE}
 
@@ -589,13 +534,9 @@ summary(model_neg)
 
 ```
 
-## **Insights:**   
-  
 The slope is negative but the beta of the year variable is not significant so we cannot conclude that negative sentiment is decreasing over time.  
 
-
-
-##### **Is postive sentiment increasing over time?**  
+### Is postive sentiment increasing over time?
 
 ```{r modelpos, eval=TRUE}
 
@@ -603,15 +544,10 @@ model_pos <- glm( freq ~ as.numeric(year), data = subset(sentiments_relative, se
 summary(model_pos)
 
 ```
-  
-  
-## **Insights:**   
-  
+
 The slope is positive but the beta of the year variable is not significant so we cannot conclude that positive sentiment is increasing over time.  
-  
 
-
-##### **Is average sentiment increasing over time?**  
+### Is average sentiment increasing over time?
 
 ```{r modelavg, eval=TRUE}
 
@@ -628,8 +564,6 @@ summary(model_avg)
 
 ```
   
-## **Insights:**   
-  
 The slope is positive and the beta of the year variable is significant at 1% so we can conclude that average sentiment is increasing over time.  
 
 But we need to be cautious with this interpretation because what could actually be going on here is that the "bing"" lexicon has more than double the number of negative words than positive words so this could be influencing the results and SONA speeches may in fact be more positive than they appear to be.
@@ -640,9 +574,7 @@ table(get_sentiments('bing')$sentiment)
 
 ```
 
-
-
-##### **Distribution of "bing" Sentiment per President**
+### Distribution of "bing" Sentiment per President
 
 ```{r eval=TRUE}
 
@@ -662,13 +594,9 @@ ggplot(sentiments_per_year, aes(x = president, y = avg_sentiment, colour = presi
 
 ```
 
-## **Insights:**    
-  
 Apart from the last 2 presidents, Ramaphosa and Zuma, the presidents are in time order. We can see that other than Motlanthe, the trend is an increasing average sentiment over time but at a decreasing rate. The interquartile range of Mbeki is smaller than Zuma's which is smaller than Mandela's.
 
-
-
-##### **Change in "bing" Sentiment over time**
+### Change in "bing" Sentiment over time
 
 ```{r eval=TRUE}
 
@@ -691,13 +619,11 @@ sentiments_per_year %>%
 
 ```
   
-## **Insights:**  
-  
 Average sentiment is the proportion of positive words out of all the words in the "bing" lexicon. Mandela shows a very erratic average sentiment, ranging from 0 to over 25. Mbeki and Zuma's average sentiment mostly ranges between 25 and 50, with the exception of a few such as 2000, 2008, 2012, 2017. 
 
+## Sentiment Analysis using "afinn" lexicon 
 
-
-##### **Sentiment Analysis using "afinn" lexicon (scale from -5 negative to +5 positive)**
+Afinn lexicon measures positivity on a scale from -5 negative to +5 positive.
 
 ```{r afinn, eval=TRUE}
 
@@ -715,13 +641,7 @@ tidy_sona_words %>%
 
 ```
   
-## **Insights:**  
-  
-The most number of words are scored positive 2, followed by positive 1. This becomes even more pronounced when scores are multiplied by counts to get weighted scores.
-  
-
-
-Let's check the distribution of all "afinn" words:
+The most number of words are scored positive 2, followed by positive 1. This becomes even more pronounced when scores are multiplied by counts to get weighted scores. The distribution of all "afinn" words is as follows:
 
 ```{r eval=TRUE}
 
@@ -731,9 +651,7 @@ table(get_sentiments('afinn')$score)
   
 Words with a score of -2 dominate the lexicon, followed by words with a score of 2. We found a relatively high number of words with a score of 2 in this analysis but it is unlikely to only be a result of its prevalence in the lexicon and we can conclude that it is probably an accurate assessment of the sentiment that prevails in the text.  
 
-
-
-##### **Distribution of "afinn" Sentiment per President**
+### Distribution of "afinn" Sentiment per President
 
 ```{r eval=TRUE}
 
@@ -755,13 +673,9 @@ ggplot(sentiments_per_year, aes(x = president, y = afinn_sentiment_perc, colour 
 
 ```
 
-## **Insights:**    
-  
 The interpretation is much the same as with the "bing" lexicon in that the trend is an increasing average sentiment over time however Zuma's median sentiment is lower than the general trend.
 
-
-
-##### **Change in "afinn" Sentiment over time**
+### Change in "afinn" Sentiment over time
 
 ```{r eval=TRUE}
 
@@ -775,13 +689,11 @@ sentiments_per_year %>%
 
 ```
   
-## **Insights:**    
-  
 Mandela and Zuma show a wave-like pattern of sentiment. Mbeki shows an increasing and then decreasing pattern.
-  
 
+## Sentiment Analysis using "nrc" lexicon 
 
-##### **Sentiment Analysis using "nrc" lexicon (infers emotion with certain words)**
+The nrc lexicon infers emotion with certain words.
 
 ```{r eval=TRUE}
 
@@ -812,7 +724,7 @@ tidy_sona_words %>%
 
 ```
   
-Let's check the distribution of all "nrc" words:
+The distribution of all "nrc" words is given by:
 
 ```{r eval=TRUE}
 
@@ -820,15 +732,9 @@ table(get_sentiments('nrc')$sentiment)
 
 ```
   
-## **Insights:**  
-   
 Words can be assigned more than 1 sentiment but we do not expect as many words to come up under "anticipation", "joy" or "surprise" given the relatively lower counts in the lexicon. So "anticipation" has a surprisingly high relative count across all presidents.  
 
 Given that "positive" sentiment is the most frequent classification in the "nrc" lexicon, it is not surprising that it comes out as the most frequently assigned classification across all presidents. The distributions across the various sentiments are very similar for all presidents so this lexicon does not provide any insights about specific presidents.
-    
-
-
-##### **Sentiment Analysis using "nrc" lexicon**
 
 ```{r eval=TRUE}
 
@@ -863,8 +769,6 @@ nrc_sentiment %>%
 
 ```
 
-  
-## **Insights:**  
    
 The negative most used words which are also associated with the "anger", "disgust", fear" and "sadness" emotions are: "violence", "struggle" and "poverty". 
 
@@ -872,16 +776,13 @@ The positive most used words which are also associated with the "anticipation", 
 
 The most usedwords that evoke the "trust" emotion are: "system", "president", "parliament" and "nation".  
 
-
-
-## Topic Modelling
-
+# Topic Modelling
 
 An effective topic model can summarise the ideas and concepts within a document - this can be used in various ways.  A user can understand the main themes within the corpus of documents and draw conclusions from these from analysis of these topics or they can use the information as type of dimensional reduction and feed these topics into different supervised or unsupervised algorithms.
 
 In this project, our group has used topic modelling to better understand the common topics that come up over the SONA speeches, how these are related to different presidents and speeches and how they change over time.  In addition, the probability that a sentence belongs to a certain topic was used in an attempt to classify which sentence was said by which president (see Section XX)
 
-### Data
+## Data
 
 The data used in this section is the clean and processed data as described in Section X.  The resulting sentence data has been used and dissected further without consideration to train and validation unless otherwise stated. 
 
@@ -2326,8 +2227,9 @@ paste0("President sentence counts in validation set:")
 paste0("Baseline_accuracies")
 (baseline_accuracies = table(input_data$sentences$president)*100/sum(table(input_data$sentences$president)))
 ```
+
 Majority of the sentences of Mbeki is predicted as Mandela(379/569).
-Majority of the sentences of Zuma is predicted as Mandela (244/534) and the secon majority is predicted as himself (195/534).
+Majority of the sentences of Zuma is predicted as Mandela (244/534) and the second majority is predicted as himself (195/534).
 Majority of the sentences of Mandela is predicted as Mandela(263/381).
 Majority of the sentences of Mothlane(38/66) is predicted as Mandela.
 Majority of sentences of Ramaphosa is predicted as Mandela(19/47) or Zuma(15/47).
