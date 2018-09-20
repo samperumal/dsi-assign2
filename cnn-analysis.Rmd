@@ -1,0 +1,80 @@
+---
+title: "CNN Analysis"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+require(tidyverse)
+require(tidytext)
+
+knitr::opts_chunk$set(echo = FALSE, fig.width = 12)
+source("data/data-sampling.R")
+
+```
+
+# Sequential Neural Networks
+
+The bag-of-words model as applied to Neural Networks treats each sentence as an unordered list of integer or one-hot-encoded elements. This captures whether a word occurs in a sentence, and the frequency of occurrence for tf-idf models. While this can be effective, it does ignore any signals in the data related to the ordering and relative positions of words. Sequential neural networks address this problem by treating the data as an ordered list of integers using a dictionary that provides a unique mapping between words and integers. The network then applies various layers to this input that attempt to extract the sequential information for use in later standard layers.
+
+For all our sequential neural network attempts, we converted each sentence to a vector of integers using a word dictionary as our x-data, and one-hot-encoded the presidents as our y-data.
+
+## Embeddings
+
+An embedding layer is a dimensionality reduction technique that attempts to encode the relationships between words in a sentence, input as a variable length integer array with padding, as a fixed-length floating point vector. An embedding has a tunable hyper-parameter for the number of latent factors to map every sentence on to, where each latent factor attempts to capture a semantic dimension of the sentence as a whole. Embeddings aim to capture the linear substructure of sentences through euclidean distances between words in the n-dimensional unit hypercube, where n is the number of latent factors specified.
+
+Embeddings can be trained on the corpus of sentences that comprise the dataset under investigation, however this can prove limiting if the there is a relatively small quantity of training data. An alternative approach is to re-use a previously trained embedding layer, such as the Glove embedding \ref{@pennington2014glove}. This has the advantage of leveraging the results from a much larger, and theoretically more generic, dataset in an application of transfer learning. The SONA data has a large number of non-standard or foreign words included, however, which theoretically limits the applicability of pre-trained embeddings.
+
+# Convolutional Neural Network (CNN)
+
+A convolutional layer applies a moving weighted-average filter (kernel) over the input data that attempts to extract simple patterns for use in later layers. They are an approach to reducing the dimensionality of input data by using a shared weighting across all input nodes, thereby addressing the exploding/vanishing gradient problem that would otherwise occur with a standard fully-connected layer. By way of example, a 100-node input layer followed by a 50-node fully connected layer would have 5000 weights to fit, whereas with an equivalent convolutional layer there would only be 50 weights.
+
+The convolutional layer has a number of tunable hyper-parameters: 
+
+ * The number of filters/nodes to train - more filters can capture more granular patterns in the data, but with diminishing returns. 
+ * The size of the kernel to be applied to the input, which determines how many adjacent data points are input to the convolution operator.
+ * The padding, if any to be used, which determines how to handle data at the boundaries of the input.
+ * The activation function applied to the output of the convolution operator.
+ * The stride of the kernel, which can be used to used to avoid overfitting at the expense of potentially missing important patterns.
+
+## Chosen structure
+
+We experimented with a number of different network topologies, and finally settled on the following:
+
+ * An embedding layer with 70 latent factors trained on the full word dictionary across all speeches.
+ * A dropout layer set to randomly exclude 50% of inputs from the previous layer on each iteration, to prevent overfitting.
+ * A convolutional layer with 50 filters, a kernel size of 3, and stride of 1
+ * A global max pooling layer, which assists in dimensionality reduction
+ * A fully connected dense layer with 128 nodes
+ * A dropout layer set to randomly exclude 50% of inputs from the previous layer on each iteration, to prevent overfitting.
+ * An activation layer using the "relu" function
+ * A fully connected dense layer with 6 nodes, to map to our output encoding
+ * An activation layer using the "softmax" function, to produce output consistent with our one-hot-encoding of presidents.
+
+## Results
+
+## Deep CNN Results
+
+We also experimented with Deep CNN architectures by adding on additional densely connected layers (with accompanying dropout and activation layers) below the Convolutional layer. Despite much experimentation with this, additional layers did not appear to have any noticeable effect on the accuracy of our results.
+
+# Recurrent Neural Network (RNN)
+
+A Recurrent Neural Network is an attempt to model the relationship between words in a sentence based on their relative positions. It involves repeatedly applying the same layer to each word of a sentence (rather than the sentence as a whole), in a manner that allows the layer to "remember" aspects of the words in the sentence that have already been seen. For our application we used a long-term-short-term (LSTM) memory layer that trains both the weights and the memory of the layer. 
+
+## Chosen structure
+
+We experimented with a number of different network topologies, and finally settled on the following:
+
+ * An embedding layer with 70 latent factors trained on the full word dictionary across all speeches.
+ * A dropout layer set to randomly exclude 50% of inputs from the previous layer on each iteration, to prevent overfitting.
+ * A convolutional layer with 50 filters, a kernel size of 3, and stride of 1
+ * A global max pooling layer, which assists in dimensionality reduction
+ * A fully connected dense layer with 128 nodes
+ * A dropout layer set to randomly exclude 50% of inputs from the previous layer on each iteration, to prevent overfitting.
+ * An activation layer using the "relu" function
+ * A fully connected dense layer with 6 nodes, to map to our output encoding
+ * An activation layer using the "softmax" function, to produce output consistent with our one-hot-encoding of presidents.
+
+## Results
+
+RNN's have been shown to achieve very good performance when applied to Natural Language Processing (NLP) of text, due to the similarities with how humans process language. Unfortunately our applied RNN did not surpass the performance of the other networks we attempted, despite many attempts at tuning. We suspect the sparsity of the dataset played a large role in this result, as it was replicated on both the balanced and unbalanced training data.
+

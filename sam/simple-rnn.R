@@ -47,23 +47,10 @@ epochs = 10
 model <- keras_model_sequential()
 
 model %>%
-  layer_embedding(
-    name = "embedding",
-    max_features,
-    embedding_size,
-    input_length = maxlen) %>%
-  layer_dropout(0.25) %>%
-  layer_conv_1d(
-    filters,
-    kernel_size,
-    padding = "valid",
-    activation = "relu",
-    strides = 1
-  ) %>%
-  layer_max_pooling_1d() %>%
-  layer_lstm(lstm_output_size) %>%
-  layer_dense(6) %>%
-  layer_activation("softmax")
+  layer_lstm(units = 32, return_sequences = TRUE, stateful = TRUE) %>%
+  layer_lstm(units = 32, return_sequences = TRUE, stateful = TRUE) %>%
+  layer_lstm(units = 32, stateful = TRUE) %>%
+  layer_dense(units = 6, activation = 'softmax')
 
 model %>% compile(
   loss = "categorical_crossentropy",

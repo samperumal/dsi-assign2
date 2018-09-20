@@ -6,9 +6,9 @@ output: html_document
 ```{r setup, include=FALSE}
 require(tidyverse)
 require(tidytext)
-
+print(getwd())
 knitr::opts_chunk$set(echo = FALSE, fig.width = 12)
-source("../data/data-sampling.R")
+source("data/data-sampling.R")
 
 ```
 
