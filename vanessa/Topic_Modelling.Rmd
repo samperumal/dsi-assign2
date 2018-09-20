@@ -11,7 +11,7 @@ knitr::opts_chunk$set(fig.width=8, fig.height=5, fig.path='Figs/',
                       echo=TRUE, warning=FALSE, message=FALSE, fig.align = "center" )
 ```
 
-```{r, echo = TRUE, warning = FALSE}
+```{r, echo = FALSE, warning = FALSE, eval=TRUE}
 #Load required librarys
 library(tidyr)
 library(knitr)
@@ -54,8 +54,7 @@ The following methodology was followed:
 ####Step One: Tokenisation, Remove Stop words and Document Term Matrix
 
 
-```{r, warning = FALSE}
-
+```{r, echo = FALSE, warning = FALSE, eval=FALSE}
 #Load data
 load("../input_data.RData")
 #Get sentence data
@@ -107,7 +106,7 @@ ggplot(aes(bigram, count_bigram)) +
 After tokenisation and removal of stop words, the top 20 most used terms across all of the SONA speeches are displayed.  Unsurprisingly, "South Africa" is the most used term followed closely by "South African" and "South Africans" and "Local Government".  These terms do not add to our understanding of the topics and tend to confuse the topic modelling going forward.  The removal of the terms allows for a cleaner interpretation.  "Public service is then the most used term.
 
 
-```{r, warning=FALSE}
+```{r, echo = FALSE, warning = FALSE, eval=FALSE}
 
 #create term count to feed into DTM
 bigrams_count <- bigrams_united %>%
@@ -153,7 +152,7 @@ In addition to this, Nikita considers how the number of k may change over a vali
 
 Below is an attempt to optimise for k and to check that the choice of k holds over an unseen data set.
 
-```{r, warning=FALSE}
+```{r, echo = FALSE, warning = FALSE, eval=FALSE}
 #sepertate the bigrams into a train and test set
 #ungroup the daat
 bigrams_sample <- bigrams_count %>% ungroup()
@@ -193,7 +192,7 @@ FindTopicsNumber_plot(result)
 
 From the above plot, the marginal benefit from adding another topic, stops at around 8-10 topics.  In order to test this, the *"perplexity"* over a test sample for the document term matrix can be checked.
 
-```{r, warning=FALSE}
+```{r, echo = FALSE, warning = FALSE, eval=FALSE}
 #initalise loop
 perplexity_df <- data.frame(train=numeric(), test=numeric())
 #set patamaets
@@ -241,8 +240,7 @@ For this assignment, Latent Dirichlet allocation (LDA) was used for the topic mo
       
       
       
-```{r, warning=FALSE}
-
+```{r, echo = FALSE, warning = FALSE, eval=FALSE}
 ##chose 5 topics
 #set seed
 set.seed(1234)
@@ -297,7 +295,8 @@ From the display of popular terms, it can be determined that the topic one has a
 
 These concepts all support the idea of the job creation as each of these will generate jobs for the country. But there is some noise in the topic for "address terms" i.e. honourable speaker or honourable chairperson.  "Nelson Mandela" and "President Mandela" crop up too which suggests that alongside the job creation theme, there exists some of what can be termed "terms of endearment" 
 
-```{r, warning=FALSE}
+```{r, echo = FALSE, warning = FALSE, eval=FALSE}
+
 ###Topic 1
 
 #filter for topic one
@@ -353,7 +352,9 @@ As with the previous topic, there is some random "terms of endearment" in this t
 In summary, this topic can be summed as "Economy/ Criminal and Justice System"
 
 
-```{r, warning=FALSE}
+```{r, echo = FALSE, warning = FALSE, eval=FALSE}
+
+
 ###Topic 2
 
 #filter for topic two
@@ -406,7 +407,7 @@ wordcloud.2
 
 Despite the most popular terms being "United Nation" and "private sector", there a theme that is "developing". As in development plan, resource development, national development and development programme etc.  And thus, the topic is named.      
 
-```{r, warning = FALSE}
+```{r, echo = FALSE, warning = FALSE, eval=FALSE}
 ###Topic 3
 
 #filter for topic three
@@ -447,6 +448,8 @@ wordcloud.3
 
 
 ```
+![Figure: Popular terms in Topic 3](images/topic3.png)
+![Figure: WordCloud for Topic 3](images/wordcloud3.png)
 
 
 #####Topic 4
@@ -455,7 +458,7 @@ Once again, there is a "term of endearment" in the popular terms ("fellow south"
 
 Given that there is a possible trigram evident here, it may be worth exploring in future work.
 
-``` {r , warning =  FALSE}
+```{r, echo = FALSE, warning = FALSE, eval=FALSE}
 
 #filter for topic four
 top_terms.4 <- speech_topics %>%
@@ -485,7 +488,7 @@ word_count.4 <- top_terms.4 %>%
 
 #word cloud
 set.seed(12345)
-wordcloud.4 <- wordcloud2(word_count.4, color = "random-dark", size = .3)
+wordcloud.4 <- wordcloud2(word_count.4, color = "random-dark", size = .4)
 
 par(mfrow = c(1,2))
 plot_topic_4
@@ -496,6 +499,9 @@ wordcloud.4
 ```
 
 
+![Figure: Popular terms in Topic 4](images/topic4.png)
+![Figure: WordCloud for Topic 4](images/Rplotwordcloud4.png)
+
 
 #####Topic 5
 
@@ -503,7 +509,7 @@ wordcloud.4
 
 
 
-``` {r, warning = FALSE}
+```{r, echo = FALSE, warning = FALSE, eval=FALSE}
 
 #filter for topic five
 top_terms.5 <- speech_topics %>%
@@ -544,9 +550,15 @@ wordcloud.5
 
 ```
 
+
+![Figure: Popular terms in Topic 5](images/topic5.png)
+![Figure: WordCloud for Topic 5](images/wordcloud5.png)
+
+
+
 A different way of looking at this topic could be to investigate the biggest differential in terms between topics.  For instance, using the log(base 2) ratio between topic 1 and topic 5, shows the terms that have the widest margin between the two topic (i.e. are far more likely to be in topic 5 versus topic 1)
 
-```{r, warning =  FALSE}
+```{r, echo = FALSE, warning = FALSE, eval=FALSE}
 #comparison of topic 1 to topic 5
 
 small_topic <- speech_topics %>%
@@ -572,7 +584,7 @@ beta_spread %>%
 
 
 ```
-
+![Figure: WordCloud for Topic 5](images/topiccompare.png)
 
 For instance, "social programmes", "human fulfilment", "rights commission" are all generated in significantly larger proportions by Topic 5 compared to Topic 1 while "national social", "training colleagues" and "sector unions" all exist with in Topic 1.
 
@@ -586,7 +598,7 @@ Given the naming of Topic 5 as "Public Sector Entities" and Topic 1 as "Job Crea
 The LDA model allows each of the sentence to be represented as a mixture of topics.  The gamma matrix shows the document-topic probability for each sentence. i.e. the probability that each sentence is drawn from that topic. For instance, the follow sentence sampled from random shows that it has a 0.905% probability of being drawn from topic 4 based on the use of the bigrams within it.  The sentence appears to be talking about the water and the infrastructure around it.  The label for topic of was "Social Reform/ Regional and Municipal Government" and this statement seems to be somewhat relevant to it.
 
 
-```{r, warning = FALSE}
+```{r, echo = FALSE, warning = FALSE, eval=FALSE}
 #get the gamma matrix and change to double and rename
 speech_documents <- cbind(as.character(topics_lda@documents), tidy(topics_lda@gamma), stringsAsFactors = FALSE)
 colnames(speech_documents) <- c("id","X1","X2","X3","X4","X5")
@@ -611,10 +623,18 @@ topic_matrix <- topic_matrix %>%
 
 #save this for Merve
 #save(topic_matrix, file = "vanessa/topic_matrix.RData")
+#save(sample, file = "./sample_sentence.RData")
 
 #random sample of sentence
 set.seed(12345)
 sample <- as.tibble(sample_n(topic_matrix, size = 1)) %>% select (- election, -id)
+#save(sample, file = "sample_sentence.RData")
+```
+
+
+
+```{r, echo = FALSE, warning = FALSE, eval=TRUE}
+load("../sample_sentence.RData")
 kable(sample, caption = "Sample sentence showing topic probabilities")
 
 ```
@@ -624,7 +644,7 @@ Using this method, the sentences can be roughly classified to a topic based on t
 (Note: the which.is.max breaks ties at random so where a sentence has equal probabilities, is will decide at random to which topic it gets assigned)
 
 
-```{r, warning = FALSE}
+```{r, echo = FALSE, warning = FALSE, eval=FALSE}
 ##find the topic per sentence
 data.max <- as.data.frame(topic_matrix[,6:10])
 data.max <- apply(topic_matrix[,6:10],1,which.is.max) 
@@ -664,7 +684,7 @@ data.graph <- left_join(data.graph, totals, by = "president") %>% mutate(pre.top
 
 
 ```
-
+![Figure: WordCloud for Topic 5](images/pres_topic.png)
 
 
 Consider the mixture of topics that each individual president covers during the SONA address.  Despite the imbalance in the number of sentences said by each president, there seems to be a fairly standard shape to the topics discussed. The two exceptions to this are de Klerk and Zuma. All other presidents tend to send around 10-15% on topic 1 ("Job Creation/Terms of Endearment") and the 15-20% on Topic 2 ("Economy/Criminal and Justice System"), Topic 3 ("Development") and Topic 4 ("Social Reform/Regional and Municipal Government") and the around another 10% on Topic 5 ("Public Sector Entities").  This trend means that it may be difficult for a supervised model to pick up difference in presidents based on the topic covered.  
@@ -677,7 +697,7 @@ President Zuma spends the majority of his speeches on Topic 4 ("Social Reform/Re
 A similar analysis can be taken over time.
 
 
-```{r}
+```{r, echo = FALSE, warning = FALSE, eval=FALSE}
 
 ##gather data
 topic_matrix_year <- topic_matrix %>%
@@ -706,6 +726,9 @@ data.graph %>%
 
 ```
 
+![Figure: WordCloud for Topic 5](images/topic_time.png)
+
+
 The graph shows that over time, topics 1 and 5 are the least discussed topics while topics 2,3 and 4 all get much the same airtime. There are a number of notable spikes/valleys:
 + In 1996, Topic 2 ("Economy/Crime and Justice System") spikes
   
@@ -719,6 +742,9 @@ The graph shows that over time, topics 1 and 5 are the least discussed topics wh
  
  From various media reports, Zuma's 2012 SONA speech largely covered the success of the government while skipping over future plans.  It may be a reason while Topic 4 ("Social Reform/Regional and Municipal Government") rises sharply. 
 
+ 
+ 
+ 
  
  
  
