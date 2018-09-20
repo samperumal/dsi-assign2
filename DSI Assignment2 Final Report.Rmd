@@ -307,7 +307,7 @@ De Klerk repeated over 30% of his words in his 1994 pre election SONA speech. On
 The count of each word that have been used in each sentence is what we are going to be feeding in. We need to unnest the sentence data, count each word in each sentence and spread the sentence word counts so that we have sentence id's in each row and we have each word as column id's. This is the simplest neural net model that we can try, so that was our first model.
 
 ```{r}
-
+library(RcppParallel)
 #Unnest words and count
 president_word_count = input_data$sentences %>%
   group_by(president) %>%
@@ -435,14 +435,19 @@ predictions_val <- cbind(test_sona, pres.actual, pres.max)
 predictions_val = predictions_val %>% select(prez, pres.actual, pres.max)
 
 
-table <- table(predictions_val$pres.actual, predictions_val_2$pres.max)
+table_bow <- table(predictions_val$pres.actual, predictions_val$pres.max)
 paste0("Accuracy rate is:" ,round((sum(diag(table))/sum(table)),4))
+```
+#**Cohen's Kappa**
 
+Kappa value tells you how much better your classifier is performing over the performance of a classifier that simply guesses at random according to the frequency of each class.
 
+"Cohen¢s kappa is always less than or equal to 1. Values of 0 or less, indicate that the classifier is useless. There is no standardized way to interpret its values. Landis and Koch (1977) provide a way to characterize values. According to their scheme a value < 0 is indicating no agreement , 0???0.20 as slight, 0.21???0.40 as fair, 0.41???0.60 as moderate, 0.61???0.80 as substantial, and 0.81???1 as almost perfect agreement."
+[Reference: Landis, J.R.; Koch, G.G. (1977). ???The measurement of observer agreement for categorical data???. Biometrics 33 (1): 159???174]
+
+```{r}
 # Calculate kappa by hand
-t = as.matrix(table)
-kappa(t)
-
+t = as.matrix(table_bow)
 
 t = cbind(t, "4" = colSums(t)/sum(colSums(t)))
 t = rbind(t, "7" = rowSums(t)/sum(rowSums(t)))
@@ -455,7 +460,13 @@ k = (prob_a - prob_b)/(1-prob_b)
 
 paste0("Kappa value is ", round(k, 3), ", and this means we are doing better than random")
 
-# Kappa value tells you how much better your classifier is performing over the performance of a classifier that simply guesses at random according to the frequency of each class.
+#Calculate kappa using a cohen.kappa()
+
+table_bow = cbind(table_bow, "4" = rep(0, 6), "5" = rep(0, 6),"6" = rep(0, 6))#make it square
+#As we have seen from the table above the nn did not predict anything for the minority classes so we have to cbind zeros as 4th,5th,6th columns. Because we need a square matrix for calculating Cohen's Kappa when using cohen.kappa() function.
+library(psych)
+cohen.kappa(table_bow)[1]
+
 ```
 
 The accuracy is slightly better than bigger model with no-dropouts (0.581%)
@@ -572,14 +583,15 @@ predictions_val <- cbind(test_sona, pres.actual, pres.max)
 predictions_val = predictions_val %>% select(prez, pres.actual, pres.max)
 
 
-table <- table(predictions_val$pres.actual, predictions_val$pres.max)
+table_tfidf <- table(predictions_val$pres.actual, predictions_val$pres.max)
 paste0("Accuracy rate is:" , round((sum(diag(t))/sum(t)),4))
-
-# Calculate kappa
+```
+#**Cohen's Kappa**
+```{r}
+table_tfidf = cbind(table_tfidf, "4" = rep(0, 6), "5" = rep(0, 6),"6" = rep(0, 6))#make it square
 
 library(psych)
-cohen.kappa(table)
-
+cohen.kappa(table_tfidf)[1] #Doing slightly better than random classifier.
 ```
 The accuracy is 0.6158 and the model starts overfitting after fourth epoch. So this is slightly better than the bag of words word-count model as we expected.
 
@@ -670,35 +682,21 @@ pres.actual = as.data.frame(pres.actual, ncol=1)
 predictions_val <- cbind(test_sona, pres.actual, pres.max)
 predictions_val = predictions_val %>% select(president, pres.actual, pres.max)
 
+predictions_val %>% filter(president == "Mandela") %>% select(pres.actual, pres.max)
 
-table <- table(predictions_val$pres.actual, predictions_val$pres.max)
+(table_sentiment <- table(actual = predictions_val$pres.actual, pred = predictions_val$pres.max))
 paste0("Accuracy rate is:" , round((sum(diag(t))/sum(t)),4))
+
 ```
+
+
 #**Cohen's Kappa**
 
-'Cohen¢s kappa is always less than or equal to 1. Values of 0 or less, indicate that the classifier is useless. There is no standardized way to interpret its values. Landis and Koch (1977) provide a way to characterize values. According to their scheme a value < 0 is indicating no agreement , 0???0.20 as slight, 0.21???0.40 as fair, 0.41???0.60 as moderate, 0.61???0.80 as substantial, and 0.81???1 as almost perfect agreement.'
-[Reference: Landis, J.R.; Koch, G.G. (1977). ???The measurement of observer agreement for categorical data???. Biometrics 33 (1): 159???174]
-
 ```{r}
-# # Calculate kappa by hand to see if it matches cohen.kappa() result.
-# t = as.matrix(table)
-# t = cbind(t, "4" = colSums(t)/sum(colSums(t)))
-# t = rbind(t, "7" = rowSums(t)/sum(rowSums(t)))
-# t[7,4] = 0
-# 
-# prob_a = sum(diag(table))/sum(colSums(table))
-# prob_b = (t[7,1]*t[1,4]) + (t[7,2]*t[2,4]) +(t[7,3]*t[3,4])
-# 
-# k = (prob_a - prob_b)/(1-prob_b)
-# 
-# paste0("Kappa value is ", round(k, 4), ", and the classifier is slightly better than random classifier") #0.1285
 
-
-#As we have seen from the table above the nn did not predict anything for hte minority classes so we have to cbind zeros as 4th,5th,6th columns. Because we need a square matrix for calculating Cohen's Kappa when using cohen.kappa() function.
-
-table = cbind(table, "4" = rep(0, 6), "5" = rep(0, 6),"6" = rep(0, 6))
+table_sentiment = cbind(table_sentiment,"3"=rep(0,6), "4" = rep(0, 6), "5" = rep(0, 6),"6" = rep(0, 6))
 library(psych)
-cohen.kappa(table)
+cohen.kappa(table_sentiment)[1]
 
 ```
 Sentiment analysis also reaches it's smallest validation loss value on the fifth iteration. But the train accuracy and test accuracy is changing very slightly at each iteration. This model does not seem to be doing well on eighter the training set or the test set. The test accuracy is 0.4361834 and the training accuracy is 0.4353395. If we look at the NRC sentiment lexicon it is visible that all presidents share same sentiment distribution pattern, so this is why it is not overfitting. Because our set aside test set is actually no different than the training set.
@@ -728,7 +726,6 @@ test_sona <- sona_gamma %>%
   anti_join(training_ids, by = "id") %>%
   select(-id)
 
-
 # Seperate response variable
 dim(sona_gamma) #6626 rows 10626 cols
 x_train <- as.matrix(training_sona %>% select(-president))
@@ -757,7 +754,7 @@ model <- keras_model_sequential() #Creating an empty sequential model
 
 model %>%
   layer_dense(units = 16, activation = 'relu', input_shape = ncol(x_train)) %>%
-  layer_dense(units = 16, activation = 'relu', kernel_regularizer = regularizer_l1_l2(l1 = 0.01, l2 = 0.01),    bias_initializer = initializer_glorot_normal()) %>%
+  layer_dense(units = 16, activation = 'relu', kernel_regularizer = regularizer_l1_l2(l1 = 0.01, l2 = 0.01),    bias_initializer = initializer_glorot_normal()) %>% #added some bias
   layer_dense(units = 6, activation = 'softmax') %>%
   compile(
     loss = 'categorical_crossentropy',
@@ -790,24 +787,18 @@ pres.actual <- apply(y_test,1,which.max)
 pres.actual = as.data.frame(pres.actual, ncol=1)
 
 predictions_val <- cbind(test_sona, pres.actual, pres.max)
-predictions_val = predictions_val %>% select(prez, pres.actual, pres.max)
+predictions_val = predictions_val %>% select(president, pres.actual, pres.max)
 
-
-table <- table(predictions_val$pres.actual, predictions_val_2$pres.max)
+(table_topic <- table(actual = predictions_val$pres.actual, pred = predictions_val$pres.max))
 paste0("Accuracy rate is:" , round((sum(diag(t))/sum(t)),4))
+```
+#**Cohen's Kappa**
+```{r}
 
-# Calculate kappa by hand
-t = as.matrix(table)
-t = cbind(t, "4" = colSums(t)/sum(colSums(t)))
-t = rbind(t, "7" = rowSums(t)/sum(rowSums(t)))
-t[7,4] = 0
+table_topic = cbind(table_topic,"3"=rep(0,6), "4" = rep(0, 6), "5" = rep(0, 6),"6" = rep(0, 6))#make it square
+library(psych)
+cohen.kappa(table)[1] #it is doing fairly better than a randomly guessing classifier.
 
-prob_a = sum(diag(table))/sum(colSums(table))
-prob_b = (t[7,1]*t[1,4]) + (t[7,2]*t[2,4]) +(t[7,3]*t[3,4])
-
-k = (prob_a - prob_b)/(1-prob_b)
-
-paste0("Kappa value is ", round(k, 3), ", and this means the results have no agreement!")
 ```
 The train and the test set are not very distinct from each other just like sentiment analysis. 
 If we look at the mixture of the topics by each president in topic modelling chunk we can see that all the topics for each president are kind of uniformed and hard to seperate each president's topic from one another.
@@ -1018,9 +1009,8 @@ Majority of the sentences of Mothlane(38/66) is predicted as Mandela.
 Majority of sentences of Ramaphosa is predicted as Mandela(19/47) or Zuma(15/47).
 Mojority of the sentences of deKlerk is predicted as Mandela(14/17).
 
-
+##**Cohen's Kappa**
 ```{r}
-#Let's calculate Cohen's kappa for this model
 library(psych)
 cohen.kappa(t) #0.116 #We are doing slightly better than random classifier.
 ```
