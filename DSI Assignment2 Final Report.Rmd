@@ -434,6 +434,16 @@ pres.actual = as.data.frame(pres.actual, ncol=1)
 predictions_val <- cbind(test_sona, pres.actual, pres.max)
 predictions_val = predictions_val %>% select(prez, pres.actual, pres.max)
 
+#We can see each presidents' classifications individually by filtering
+head(predictions_val %>% filter(prez == "Mbeki") %>% select(pres.max, pres.actual)) #President numero 1
+head(predictions_val %>% filter(prez == "Zuma") %>% select(pres.max, pres.actual)) #President numero 2
+head(predictions_val %>% filter(prez == "Mandela") %>% select(pres.max, pres.actual)) #President numero 3
+head(predictions_val %>% filter(prez == "Motlanthe") %>% select(pres.max, pres.actual)) #President numero 4
+head(predictions_val %>% filter(prez == "Ramaphosa") %>% select(pres.max, pres.actual)) #President numero 5
+head(predictions_val %>% filter(prez == "deKlerk") %>% select(pres.max, pres.actual))#President numero 6
+
+(predictions_val %>% select(prez, pres.actual) %>% unique %>% arrange(-desc(pres.actual)))
+
 
 table_bow <- table(predictions_val$pres.actual, predictions_val$pres.max)
 paste0("Accuracy rate is:" ,round((sum(diag(table))/sum(table)),4))
@@ -582,6 +592,16 @@ pres.actual = as.data.frame(pres.actual, ncol=1)
 predictions_val <- cbind(test_sona, pres.actual, pres.max)
 predictions_val = predictions_val %>% select(prez, pres.actual, pres.max)
 
+#We can see each presidents' classifications individuallyby filtering
+head(predictions_val %>% filter(prez == "Mbeki") %>% select(pres.max, pres.actual)) #President numero 1
+head(predictions_val %>% filter(prez == "Zuma") %>% select(pres.max, pres.actual)) #President numero 2
+head(predictions_val %>% filter(prez == "Mandela") %>% select(pres.max, pres.actual)) #President numero 3
+head(predictions_val %>% filter(prez == "Motlanthe") %>% select(pres.max, pres.actual)) #President numero 4
+head(predictions_val %>% filter(prez == "Ramaphosa") %>% select(pres.max, pres.actual)) #President numero 5
+head(predictions_val %>% filter(prez == "deKlerk") %>% select(pres.max, pres.actual))#President numero 6
+
+(predictions_val %>% select(prez, pres.actual) %>% unique %>% arrange(-desc(pres.actual)))
+
 
 table_tfidf <- table(predictions_val$pres.actual, predictions_val$pres.max)
 paste0("Accuracy rate is:" , round((sum(diag(t))/sum(t)),4))
@@ -683,6 +703,7 @@ predictions_val <- cbind(test_sona, pres.actual, pres.max)
 predictions_val = predictions_val %>% select(president, pres.actual, pres.max)
 
 predictions_val %>% filter(president == "Mandela") %>% select(pres.actual, pres.max)
+(predictions_val %>% select(president, pres.actual) %>% unique %>% arrange(-desc(pres.actual)))
 
 (table_sentiment <- table(actual = predictions_val$pres.actual, pred = predictions_val$pres.max))
 paste0("Accuracy rate is:" , round((sum(diag(t))/sum(t)),4))
@@ -789,9 +810,12 @@ pres.actual = as.data.frame(pres.actual, ncol=1)
 predictions_val <- cbind(test_sona, pres.actual, pres.max)
 predictions_val = predictions_val %>% select(president, pres.actual, pres.max)
 
+(predictions_val %>% select(president, pres.actual) %>% unique %>% arrange(-desc(pres.actual)))
 (table_topic <- table(actual = predictions_val$pres.actual, pred = predictions_val$pres.max))
 paste0("Accuracy rate is:" , round((sum(diag(t))/sum(t)),4))
 ```
+Topic modelling only predicted for president 1(Mbeki) and president 2(Zuma).
+
 #**Cohen's Kappa**
 ```{r}
 
