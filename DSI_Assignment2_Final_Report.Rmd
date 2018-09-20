@@ -13,7 +13,7 @@ output: html_document
 ##---------------------------------##
 
 knitr::opts_chunk$set(
-  echo = FALSE, eval = TRUE, warning = FALSE
+  echo = FALSE, eval = TRUE, warning = FALSE, fig.align = "center"
 )
 
 suppressPackageStartupMessages({
@@ -260,7 +260,6 @@ bigram_count <- tidy_sona_bigrams %>%
   count(bigram, sort = TRUE)
 
 wordcloud2(bigram_count[1:300, ], size = .8, color='random-dark')
-
 ```
 
 ## Lexical Diversity per President
@@ -864,9 +863,9 @@ Given that there is such a low percentage of bigrams with negation words, it is 
 
 # Topic Modelling
 
-An effective topic model can summarise the ideas and concepts within a document - this can be used in various ways.  A user can understand the main themes within the corpus of documents and draw conclusions from these from analysis of these topics or they can use the information as type of dimensional reduction and feed these topics into different supervised or unsupervised algorithms.
+An effective topic model can summarise the ideas and concepts within a document - this can be used in various ways.  A user can understand the main themes within the corpus of documents and draw conclusions from analysis of these topics or they can use the information as a type of dimensionality reduction and feed these topics into different supervised or unsupervised algorithms.
 
-In this project, our group has used topic modelling to better understand the common topics that come up over the SONA speeches, how these are related to different presidents and speeches and how they change over time.  In addition, the probability that a sentence belongs to a certain topic was used in an attempt to classify which sentence was said by which president (see Section XX)
+In this project, our group has used topic modelling to better understand the common topics that come up over the SONA speeches, how these are related to different presidents and speeches and how they change over time.  In addition, the probability that a sentence belongs to a certain topic was used in an attempt to classify which sentence was said by which president (see section on Neural Networks).
 
 ## Data
 
@@ -877,17 +876,14 @@ The data used in this section is the clean and processed data as described in Se
 
 The following methodology was followed:
 
-1. Each sentence was tokenised into "bigrams", stop words removed and a document-term matrix set up
-    Bigrams were chosen over individual words as they provided more context and meaning.
-2. An optimisation technique was used to help determine the number of topics that are covered in the corpus of documents and this optimisation was validated on a hold out sample.
-3. Latent Dirichlet allocation was used to determine the probability of bigrams belong to certain topics and the probability that sentences belonged to topics.
-4. Text mining methods were deployed to extract insight into the different topics
-5. The probability of sentences to each topics were then passed through to a neural network.
+ 1. Each sentence was tokenised into "bigrams", stop words removed and a document-term matrix set up. Bigrams were chosen over individual words as they provided more context and meaning.
+ 2. An optimisation technique was used to help determine the number of topics that are covered in the corpus of documents and this optimisation was validated on a hold out sample.
+ 3. Latent Dirichlet allocation was used to determine the probability of bigrams belong to certain topics and the probability that sentences belonged to topics.
+ 4. Text mining methods were deployed to extract insight into the different topics
+ 5. The probability of sentences to each topics were then passed through to a neural network.
 
 
-
-
-#### Step One: Tokenisation, Remove Stop words and Document Term Matrix
+### Step One: Tokenisation, Remove Stop words and Document Term Matrix
 
 
 ```{r, echo = FALSE, warning = FALSE, eval=FALSE}
@@ -971,7 +967,7 @@ cast_dtm(id, bigram, count_bigram)
 
 ### Step 2: Optimisation of k - the number of topics.
 
-A pre-requisite of topic modelling is knowing the number of topics that each corpus may contain (i.e. the latent factor k) In some cases, this may be a fair assumption but without reading though each speech, how  could one know how many different topics have been articulated in the SONA's?  Luckily, Murzintcev Nikita has published an R- package (ldatuning) that helps to optimise the number of topics (k) over three different measures. The measures used to determine the number of topics, are discussed in an RPubs paper which can found here: [link](http://www.rpubs.com/MNidhi/NumberoftopicsLDA) and the following optimisation largely follows the accompanying vignette: [link] (https://cran.r-project.org/web/packages/ldatuning/vignettes/topics.html)
+A pre-requisite of topic modelling is knowing the number of topics that each corpus may contain (i.e. the latent factor k). In some cases, this may be a fair assumption but without reading though each speech, how  could one know how many different topics have been articulated in the SONA's?  Luckily, Murzintcev Nikita has published an R- package (ldatuning) that helps to optimise the number of topics (k) over three different measures. The measures used to determine the number of topics, are discussed in an RPubs paper which can found here: [link](http://www.rpubs.com/MNidhi/NumberoftopicsLDA) and the following optimisation largely follows the accompanying vignette: [link] (https://cran.r-project.org/web/packages/ldatuning/vignettes/topics.html)
 
 The following extract from the RPub paper gives a brief explanation of the methods used to optimise for k:
 
@@ -1026,7 +1022,7 @@ FindTopicsNumber_plot(result)
 
 ![Figure: Optimisation Metrics](images/Optimisation.png)
 
-From the above plot, the marginal benefit from adding another topic, stops at around 8-10 topics.  In order to test this, the *"perplexity"* over a test sample for the document term matrix can be checked.
+From the above plot, the marginal benefit from adding another topic, stops at around 5-10 topics.  In order to test this, the *"perplexity"* over a test sample for the document term matrix can be checked.
 
 ```{r, echo = FALSE, warning = FALSE, eval=FALSE}
 #initalise loop
@@ -1059,21 +1055,17 @@ g
 
 ![Figure: Perplexity Plot](images/perplexity.png)
 
-As more topics are used, the perplexity of the training sample does decrease but that of the test sample increases from around 11 topic.  The perplexity of the test sample seems to be minimised at around 8 topics.  
+As more topics are used, the perplexity of the training sample does decrease but that of the test sample increases from around 11 topics. The perplexity of the test sample seems to be minimised at around 5 topics.  
 
-The evidence from these two plots suggest that the optimal number topics sits at around 8 topics.  
-
-
-
+The evidence from these two plots suggest that the optimal number topics sits at 5 topics.  
 
 ### Step 3: Latent Dirichlet allocation 
 
-
 For this assignment, Latent Dirichlet allocation (LDA) was used for the topic modelling.  Other methods, such as a Latent Semantic Analysis (LSA) or Probabilistic Latent Semantic Analysis (pLSA) could have been used but LDA is useful due to the fact that it allows:
-      1. Each document within the corpus to be a mixture of topics
-      2. Each topic to be a mixture of bigrams
-      3. The topics are assumed to be drawn from Dirichlet distribution (i.e. not k different distributions as with pLSA) so there are less parameters to estimate and no need to estimate the probability that the corpus generates a specific document.
-      
+
+ 1. Each document within the corpus to be a mixture of topics
+ 2. Each topic to be a mixture of bigrams
+ 3. The topics are assumed to be drawn from Dirichlet distribution (i.e. not k different distributions as with pLSA) so there are fewer parameters to estimate and no need to estimate the probability that the corpus generates a specific document.
       
       
 ```{r, echo = FALSE, warning = FALSE, eval=FALSE}
@@ -1109,18 +1101,11 @@ speech_topics <- speech_topics %>%
 
 ```
 
-
-      
 ### Step 4: Extracting insights  
 
-
-      
-      
 #### Understanding the topics via the bigrams      
       
 The beta matrix produced gives the probability of the topic producing that bigram (i.e. that the phrase is in reference to that topic.)  From this measure, one can get a sense of what the character of the topic is. By using the most popular phrases in each topic, understanding of the flavour of each topic emerges.  However, it must be kept in mind that terms can belong to *more than one topic* so applying some logic to get a theme or flavour should be done liberally.
-
-
 
 ##### Topic One
 
@@ -1179,14 +1164,14 @@ wordcloud.1
 ##### Topic Two
 
 
-As with the previous topic, there is some random "terms of endearment" in this topic as well (i.e. "madam speaker") but it is not as evident as in the first topic. This is to be expected as bigrams can be generated by more than one topic as each topic is a mixture of bigrams!  The next four terms sums out the main themes for this topic:
-+ "Economic Empowerment"
-+ "Black Economic"
-+ "Justice System"
-+ "Criminal Justice"
+As with the previous topic, there are some random "terms of endearment" in this topic (i.e. "madam speaker") but it is not as evident as in the first topic. This is to be expected as bigrams can be generated by more than one topic as each topic is a mixture of bigrams!  The next four terms sum up the main themes for this topic:
 
-In summary, this topic can be summed as "Economy/ Criminal and Justice System"
+ * "Economic Empowerment"
+ * "Black Economic"
+ * "Justice System"
+ * "Criminal Justice"
 
+This topic can be named as "Economy/ Criminal and Justice System".
 
 ```{r, echo = FALSE, warning = FALSE, eval=FALSE}
 
@@ -1241,7 +1226,7 @@ wordcloud.2
 ##### Topic Three
 
 
-Despite the most popular terms being "United Nation" and "private sector", there a theme that is "developing". As in development plan, resource development, national development and development programme etc.  And thus, the topic is named.      
+Despite the most popular terms being "United Nation" and "private sector", there is a theme that is "developing". As in development plan, resource development, national development and development programme etc. and thus, the topic is named "Development".      
 
 ```{r, echo = FALSE, warning = FALSE, eval=FALSE}
 ###Topic 3
@@ -1392,7 +1377,7 @@ wordcloud.5
 
 
 
-A different way of looking at this topic could be to investigate the biggest differential in terms between topics.  For instance, using the log(base 2) ratio between topic 1 and topic 5, shows the terms that have the widest margin between the two topic (i.e. are far more likely to be in topic 5 versus topic 1)
+A different way of looking at this topic could be to investigate the biggest differential in terms between topics.  For instance, using the log(base 2) ratio between topic 1 and topic 5, shows the terms that have the widest margin between the two topics (i.e. they are far more likely to be in topic 5 versus topic 1).
 
 ```{r, echo = FALSE, warning = FALSE, eval=FALSE}
 #comparison of topic 1 to topic 5
@@ -1426,12 +1411,9 @@ For instance, "social programmes", "human fulfilment", "rights commission" are a
 
 Given the naming of Topic 5 as "Public Sector Entities" and Topic 1 as "Job Creation/Terms of Endearment" these terms do seem to be grouped in line with expectation.
 
-
-
-
 #### Understanding the mixture of topics within the sentence    
 
-The LDA model allows each of the sentence to be represented as a mixture of topics.  The gamma matrix shows the document-topic probability for each sentence. i.e. the probability that each sentence is drawn from that topic. For instance, the follow sentence sampled from random shows that it has a 0.905% probability of being drawn from topic 4 based on the use of the bigrams within it.  The sentence appears to be talking about the water and the infrastructure around it.  The label for topic of was "Social Reform/ Regional and Municipal Government" and this statement seems to be somewhat relevant to it.
+The LDA model allows each of the sentence to be represented as a mixture of topics.  The gamma matrix shows the document-topic probability for each sentence. i.e. the probability that each sentence is drawn from that topic. For instance, the following sentence sampled from random shows that it has a 0.905% probability of being drawn from topic 4 based on the use of the bigrams within it.  The sentence appears to be talking about the water and the infrastructure around it.  The label for topic of was "Social Reform/ Regional and Municipal Government" and this statement seems to be somewhat relevant to it.
 
 
 ```{r, echo = FALSE, warning = FALSE, eval=FALSE}
@@ -1566,33 +1548,26 @@ data.graph %>%
 
 
 The graph shows that over time, topics 1 and 5 are the least discussed topics while topics 2,3 and 4 all get much the same airtime. There are a number of notable spikes/valleys:
-+ In 1996, Topic 2 ("Economy/Crime and Justice System") spikes
-  
-  The 1996 SONA was a few months ahead of the introduction of the new constitution as well as at the time of the start of the Truth and Reconciliation Commission.  It could be suggested that these two ideas would drive up the topic in the SONA speech.
 
-+ In 2005, topic 1 ("Job Creations/Terms of Endearment") dives while topic 4 ("Social Reform/Region and Municipal Government") and Topic 2 ("Economy/Criminal and Justice System") spike considerably
+ * In 1996, Topic 2 ("Economy/Crime and Justice System") spikes
+  - The 1996 SONA was a few months ahead of the introduction of the new constitution as well as at the time of the start of the Truth and Reconciliation Commission.  It could be suggested that these two ideas would drive up the topic in the SONA speech.
 
-  Mbeki's term in presidency (1998 - 2008) was characterised by a rise in crime specifically in farm attacks as well as the HIV/AID epidemic and the start of the Black Economic Empowerment  in 2005 which could attribute the spikes and drops of topics in 2005.
+ * In 2005, topic 1 ("Job Creations/Terms of Endearment") dives while topic 4 ("Social Reform/Region and Municipal Government") and Topic 2 ("Economy/Criminal and Justice System") spike considerably.
+  - Mbeki's term in presidency (1998 - 2008) was characterised by a rise in crime specifically in farm attacks as well as the HIV/AID epidemic and the start of the Black Economic Empowerment  in 2005 which could attribute the spikes and drops of topics in 2005.
 
-+ In 2012, Topic 2 dives considerably ("Economy/Criminal and Justice System")
- 
- From various media reports, Zuma's 2012 SONA speech largely covered the success of the government while skipping over future plans.  It may be a reason while Topic 4 ("Social Reform/Regional and Municipal Government") rises sharply. 
+ * In 2012, Topic 2 dives considerably ("Economy/Criminal and Justice System").
+  - From various media reports, Zuma's 2012 SONA speech largely covered the success of the government while skipping over future plans.  It may be a reason while Topic 4 ("Social Reform/Regional and Municipal Government") rises sharply. 
 
  
- 
- 
- 
- 
- 
-#### Step Five: Using the topic to predict the president
+### Step Five: Using the topic to predict the president
 
 One of the aims behind topic modelling is to reduce the dimensions of the data to allow for other techniques to be applied.  In this instance, the aim was to reduce the SONA speeches to a collection of topics that would help predict which president was responsible for a sentence in the SONA speech.  The assumption was that each president might have a unique set of topics or mixture of topics that could characterise their particular speech.  However, there does not seem to be evidence of this.  The matrix with the probability of each sentence belonging to a topic is used in Section X and the results are discussed.
 
-## **Neural Nets **
+# Neural Nets 
 
-### **Neural Net with Bag of Words Data**
+## Neural Net with Bag of Words Data
 
-The count of each word that have been used in each sentence is what we are going to be feeding in. We need to unnest the sentence data, count each word in each sentence and spread the sentence word counts so that we have sentence id's in each row and we have each word as column id's. This is the simplest neural net model that we can try, so that was our first model.
+The input to our Neural Networks is the frequency of each word within the sentence. To accomplish this, we unnest the sentence data, count each word in each sentence and spread the sentence word counts so that we have sentence id's in each row and each word is a column. This simple neural network model was our first attempt.
 
 ```{r train_accuracy_wordcount_bigger, eval=FALSE}
 #Unnest words and count
@@ -1668,12 +1643,14 @@ model %>% fit(x_train, y_train, epochs = 10, batch_size = 32, validation_data = 
 ```
 ```{r}
 load("mnn.RData")
+load("nnm2.RData")
 ```
 ![Figure: Bag of words model - neural net training](images/test_accuracy_wordcount_bigger.png)
 
 This model has L2 regularization to avoid overfitting but even so it didn't help very much. The accuracy is 0.55886. The optimizer_rmsprop has learning rate 0.003. This was choosen after trying lr=c(0.001, 0.002, 0.003) To make readability easier the model with best learning rate is used. 
 
-As we can see from the plot model overfits after the second iteration, since the loss function start increasing in value, so to avoid that let's use a smaller model with less neurons and add a dropout.
+As we can see from the plot, the model overfits after the second iteration, since the loss function starts increasing in value. To avoid that we attempted a smaller model with fewer neurons and added a dropout.
+
 ```{r table_bow, eval=FALSE}
 model <- keras_model_sequential() #Creating an empty sequential model
 
@@ -1740,17 +1717,17 @@ head(predictions_val %>% filter(prez == "deKlerk") %>% select(pres.max, pres.act
 table_bow <- table(actual = predictions_val$pres.actual, pred = predictions_val$pres.max)
 paste0("Accuracy rate is:" ,round((sum(diag(table_bow))/sum(table_bow)),4))
 ```
-![Figure: Bag of words model - neural net training](images/test_accuracy_wordcount_smaller.png)
+![Figure: Bag of words model - smaller model - neural net training](images/test_accuracy_wordcount_smaller.png)
 
-`r table_bow`
+`r table_bow %>% kable() %>% kable_styling()`
 
 Accuracy rate is: `r round((sum(diag(table_bow))/sum(table_bow)),4)`.
 
-#### **Cohen's Kappa**
+### Cohen's Kappa
 
-Kappa value tells you how much better your classifier is performing over the performance of a classifier that simply guesses at random according to the frequency of each class.
+The Kappa value tells you how much better your classifier is performing than simply guessing at random according to the frequency of each class.
 
-"Cohen’s kappa is always less than or equal to 1. Values of 0 or less, indicate that the classifier is useless. There is no standardized way to interpret its values. Landis and Koch (1977) provide a way to characterize values. According to their scheme a value < 0 is indicating no agreement, 0-0.20 as slight, 0.21-0.40 as fair, 0.41-0.60 as moderate, 0.61-0.80 as substantial, and 0.81-1 as almost perfect agreement."
+*"Cohen’s kappa is always less than or equal to 1. Values of 0 or less, indicate that the classifier is useless. There is no standardized way to interpret its values. Landis and Koch (1977) provide a way to characterize values. According to their scheme a value < 0 is indicating no agreement, 0-0.20 as slight, 0.21-0.40 as fair, 0.41-0.60 as moderate, 0.61-0.80 as substantial, and 0.81-1 as almost perfect agreement."*
 [Reference: Landis, J.R.; Koch, G.G. (1977). "The measurement of observer agreement for categorical data". Biometrics 33 (1): 159-174]
 
 The Kappa value is, `r round(cohen.kappa(table_bow)[1]$kappa, 3)` and this means we are doing better than random.
@@ -1760,9 +1737,9 @@ Just for the word-count model seems good enough. But this model does not conside
 
 After the fourth iteration validation loss starts increasing which is a sign of overfitting. 
 
-### **Neural Net with tf-idf Data**
+## Neural Net with tf-idf Data
 
-TFIDF is a statisic that shows how important a word is to it's corpus. So if we are feeding NN with TFIDF we are logically expecting the results to be slightly better than the word-cout NN model. 
+TF-IDF is a statisic that shows how important a word is in the context of its corpus. Feeding a NN with TF-IDF we expect the results to be slightly better than the word-count NN model. 
 
 ```{r tfidf, eval=FALSE}
 tidy_sona = input_data$sentences %>%
@@ -1883,21 +1860,22 @@ table_tfidf <- table(predictions_val$pres.actual, predictions_val$pres.max)
 paste0("Accuracy rate is:" , round((sum(diag(t))/sum(t)),4))
 ```
 ```{r}
-kable(table_tfidf)
+table_tfidf %>% kable() %>% kable_styling()
 ```
-![Figure: Bag of words model - neural net training](images/test_accuracy_wordcount_smaller.png)
+![Figure: TF-IDF model - neural net training](images/test_accuracy_tfidf.png)
 
 Accuracy rate is: `r round((sum(diag(table_tfidf))/sum(table_tfidf)),4)`.
 
-#### **Cohen's Kappa**
+### Cohen's Kappa
 ```{r eval=FALSE}
 table_tfidf = cbind(table_tfidf, "4" = rep(0, 6), "5" = rep(0, 6),"6" = rep(0, 6))#make it square
 
 cohen.kappa(table_tfidf)[1] #Doing slightly better than random classifier.
 ```
+
 The accuracy is 0.6158 and the model starts overfitting after fourth epoch. So this is slightly better than the bag of words word-count model as we expected.
 
-### **Neural Net with Sentiment Analysis Data**
+## Neural Net with Sentiment Analysis Data
 ```{r nnwith, eval=FALSE}
 #The preparation of this file can be found in the same directory as the .Rdata file.
 load("audrey/sentiment_all.Rdata")
@@ -1992,15 +1970,15 @@ paste0("Accuracy rate is:" , round((sum(diag(table_sentiment))/sum(table_sentime
 
 ```
 ```{r}
-kable(table_sentiment)
+table_sentiment %>% kable() %>% kable_styling()
 ```
 
-![Figure: Bag of words model - neural net training](images/test_accuracy_sentiment.png)
+![Figure: Sentiment Analysis - neural net training](images/test_accuracy_sentiment.png)
 
 Accuracy of sentiment analysis is: `r round(test_accuracy_sentiment,3)` [`r  round((sum(diag(table_sentiment))/sum(table_sentiment)),4)`].
 
 
-#### **Cohen's Kappa**
+### Cohen's Kappa
 
 ```{r eval=FALSE}
 
@@ -2008,9 +1986,11 @@ Accuracy of sentiment analysis is: `r round(test_accuracy_sentiment,3)` [`r  rou
 cohen.kappa(table_sentiment)[1]
 
 ```
-Sentiment analysis also reaches it's smallest validation loss value on the fifth iteration. But the train accuracy and test accuracy is changing very slightly at each iteration. This model does not seem to be doing well on eighter the training set or the test set. The test accuracy is 0.4361834 and the training accuracy is 0.4353395. If we look at the NRC sentiment lexicon it is visible that all presidents share same sentiment distribution pattern, so this is why it is not overfitting. Because our set aside test set is actually no different than the training set.
 
-### **Neural Nets with Topic Modelling Data (Gamma Values)**
+Sentiment analysis also reaches it's smallest validation loss value on the fifth iteration. But the train accuracy and test accuracy is changing very slightly at each iteration. This model does not seem to be doing well on either the training set or the test set. The test accuracy is 0.4361834 and the training accuracy is 0.4353395. If we look at the NRC sentiment lexicon it is visible that all presidents share same sentiment distribution pattern, so this is why it is not overfitting. Because our set aside test set is actually no different than the training set.
+
+## Neural Nets with Topic Modelling Data (Gamma Values)
+
 ```{r topicnn, eval=FALSE}
 #The preparation of this topic_matrix can be found in the 
 load("vanessa/topic_matrix.RData")
@@ -2104,19 +2084,20 @@ paste0("Accuracy rate is:" , round((sum(diag(t))/sum(t)),4))
 ```
 Topic modelling only predicted for president 1(Mbeki) and president 2(Zuma).
 
-![Figure: Bag of words model - neural net training](images/test_accuracy_topic.png)
+![Figure: Topic Modelling - neural net training](images/test_accuracy_topic.png)
 
-#### **Cohen's Kappa**
+### Cohen's Kappa
+
 ```{r eval=FALSE}
 
-table_topic = cbind(table_topic,"3"=rep(0,6), "4" = rep(0, 6), "5" = rep(0, 6),"6" = rep(0, 6))#make it square
+#table_topic = cbind(table_topic,"3"=rep(0,6), "4" = rep(0, 6), "5" = rep(0, 6),"6" = rep(0, 6))#make it square
 cohen.kappa(table)[1] #it is doing fairly better than a randomly guessing classifier.
 
 ```
 The train and the test set are not very distinct from each other just like sentiment analysis. 
 If we look at the mixture of the topics by each president in topic modelling chunk we can see that all the topics for each president are kind of uniformed and hard to seperate each president's topic from one another.
 
-### **CNN with Transfer Learning (Pre-trained Embeddings)**
+## CNN with Transfer Learning (Pre-trained Embeddings)
 
 We will be using GloVe embeddings. GloVe stands for "Global Vectors for Word Representation" and is an unsupervised learning algorithm for obtaining vector representations for words as it is stated in their website. Training is performed on aggregated global word-word co-occurrence statistics from a corpus, and the resulting representations showcase interesting linear substructures of the word vector space.
 [Reference:Jeffrey Pennington, Richard Socher, and Christopher D. Manning. 2014. GloVe: Global Vectors for Word Representation:https://nlp.stanford.edu/pubs/glove.pdf ]
@@ -2131,7 +2112,7 @@ This note is taken from the reference given above and as they state the accuracy
 [reference for implementation on R: https://github.com/rstudio/keras/blob/master/vignettes/examples/pretrained_word_embeddings.R]
 
 
-Also for the pre-trained embeddings to work well it needs to be trained with similar type of data that you are trying to classify, and the fact that the GloVe embeddings are trained on Wikipedia data one can expect that it would not neccesarily help predict the presidents better for our sentences.
+Also for the pre-trained embeddings to work well it needs to be trained with a similar type of data as you are trying to classify. The GloVe embeddings are trained on Wikipedia data, thus one can expect that it would not neccesarily help predict the presidents better for our sentences.
 
 ```{r eval=FALSE}
 #Load the data we are going to be embedding
@@ -2314,17 +2295,22 @@ paste0("Baseline_accuracies")
 (baseline_accuracies = table(input_data$sentences$president)*100/sum(table(input_data$sentences$president)))
 ```
 
-Majority of the sentences of Mbeki is predicted as Mandela(379/569).
-Majority of the sentences of Zuma is predicted as Mandela (244/534) and the second majority is predicted as himself (195/534).
-Majority of the sentences of Mandela is predicted as Mandela(263/381).
-Majority of the sentences of Mothlane(38/66) is predicted as Mandela.
-Majority of sentences of Ramaphosa is predicted as Mandela(19/47) or Zuma(15/47).
-Mojority of the sentences of deKlerk is predicted as Mandela(14/17).
+![Figure: Glove transfer learning - neural net training](images/test_accuracy_transferlearning.png)
 
-#### **Cohen's Kappa**
-```{r eval=FALSE}
-cohen.kappa(t) #0.116 #We are doing slightly better than random classifier.
+```{r}
+t %>% kable() %>% kable_styling()
 ```
+
+ * Majority of the sentences of Mbeki is predicted as Mandela(379/569).
+ * Majority of the sentences of Zuma is predicted as Mandela (244/534) and the second majority is predicted as himself (195/534).
+ * Majority of the sentences of Mandela is predicted as Mandela(263/381).
+ * Majority of the sentences of Mothlane(38/66) is predicted as Mandela.
+ * Majority of sentences of Ramaphosa is predicted as Mandela(19/47) or Zuma(15/47).
+ * Mojority of the sentences of deKlerk is predicted as Mandela(14/17).
+
+### Cohen's Kappa
+
+With a Kappa value of `r cohen.kappa(t)[1]`, we are doing moderately better than a random classifier.
 
 # Sequential Neural Networks
 
@@ -2388,80 +2374,36 @@ We experimented with a number of different network topologies, and finally settl
  * A fully connected dense layer with 6 nodes, to map to our output encoding
  * An activation layer using the "softmax" function, to produce output consistent with our one-hot-encoding of presidents.
 
-## Results
+## Results 
 
 RNN's have been shown to achieve very good performance when applied to Natural Language Processing (NLP) of text, due to the similarities with how humans process language. Unfortunately our applied RNN did not surpass the performance of the other networks we attempted, despite many attempts at tuning. We suspect the sparsity of the dataset played a large role in this result, as it was replicated on both the balanced and unbalanced training data.
 
-
-
-
-## **Neural Net (nn) to predict the President from a Sentence**
-
+# Neural Network Results Overview
 
 ```{r nn, eval=TRUE}
+result_data = rbind(
+  c("Bigger word-count", train_accuracy_wordcount_bigger$acc, test_accuracy_wordcount_bigger$acc),
+  c("Smaller word-count", train_accuracy_wordcount_smaller$acc, test_accuracy_wordcount_smaller$acc),
+  c("TF-IDF model", train_accuracy_tfidf$acc, test_accuracy_tfidf$acc),
+  c("Sentiment Analysis", train_accuracy_sentiment, test_accuracy_sentiment),
+  c("Topic modelling", test_accuracy_topic$acc, train_accuracy_topic$acc),
+  c("Transfer Learning", train_accuracy_transferlearn$acc, test_accuracy_transferlearn$acc),
+  c("CNN", 0.9946, 0.6109),
+  c("RNN", 0.35, 0.35)
+)
 
-# sam / merve?? 
-# merve says: I have actually done my predictions within chunks, so we can remove this part. Votes?
+colnames(result_data) = c("Model", "Train Accuracy", "Test Accuracy")
 
-paste0("Test accuracy for the bigger word-count model is ", test_accuracy_wordcount_bigger$acc) #0.55886
-paste0("Train accuracy for the bigger word-count model is ", train_accuracy_wordcount_bigger$acc)
-
-paste0("Test accuracy for the smaller word-count model is ", test_accuracy_wordcount_smaller$acc) #0.5811648
-paste0("Train accuracy for the smaller word-count model is ", train_accuracy_wordcount_smaller$acc)
-
-paste0("Test accuracy for the tf-idf model is ", test_accuracy_tfidf$acc) #0.6146221
-paste0("Train accuracy for the tf-idf model is ", train_accuracy_tfidf$acc)
-
-paste0("Test accuracy for the sentiment analysis nn is ", test_accuracy_sentiment) #
-paste0("Train accuracy for the sentiment analysis nn is ", train_accuracy_sentiment)
-
-paste0("Test accuracy for the topic modelling nn is ", test_accuracy_topic$acc) #
-paste0("Train accuracy for the topic modelling nn is ", train_accuracy_topic$acc)
-
-#paste0("Test accuracy for the transfer learning CNN is ", test_accuracy_transferlearn) #0.4634449
-#paste0("Train accuracy for the transfer learning CNN is ", train_accuracy_transferlearn)
-
-
+result_data %>% kable() %>% kable_styling()
 ```
 
-#### **Evaluate Out of Sample Performance**
+# Conclusions
 
-test_acc
+The sentiment and topic models give some insight into the SONA speeches with regard to the general feeling and themes discussed.  Disappointingly, they do not give enough flavour of the man behind the presidency – perhaps they shared speech writers?
 
-## **Convolutional Neural Net (cnn) to predict the President from a Sentence**
+Predicting which president said a sentence has only reasonable success despite many alternative approaches.  Our best validation accuracy cannot overcome the 65% mark.  Considering the imbalanced nature of the data and the fact that Zuma dominates the number of sentences, it may be the best we can hope to predict.  However, this does four times better than randomly picking one the six presidents which would only give an accuracy rate of 16.67%.
 
-```{r cnn}
-
-# ?? Also done this part inside the chunks, thought it was easier to see that way.
-
-```
-
-
-
-### **Evaluate Out of Sample Performance**
-
-
-#### **Recurrent Neural Net (rnn) to predict President from Sentence**
-
-
-```{r rnn}
-
-# sam
-
-```
-
-
-
-#### **Evaluate Out of Sample Performance**
-
-here we can combine all the train and test accuracies in a table, as a conclusion.
-
-## **Analysis of Results and Conclusion**
-
-Also done the critisism after each chunk. 
-
-
-## **References**
+# References
 
 https://www.kaggle.com/rtatman/tutorial-sentiment-analysis-in-r
 
@@ -2476,3 +2418,5 @@ https://keras.rstudio.com/articles/examples/pretrained_word_embeddings.html
 https://github.com/rstudio/keras/blob/master/vignettes/examples/pretrained_word_embeddings.R
 
 Landis, J.R.; Koch, G.G. (1977). "The measurement of observer agreement for categorical data". Biometrics 33 (1): 159-174
+
+Jeffrey Pennington and Richard Socher and Christopher D. Manning, "Empirical Methods in Natural Language Processing (EMNLP)", http://www.aclweb.org/anthology/D14-1162
