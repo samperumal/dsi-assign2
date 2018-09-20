@@ -23,10 +23,11 @@ knitr::opts_chunk$set(
   library(lubridate),
   library(knitr),
   library(wordcloud),
-  library(wordcloud2),    # wordcloud
-  library(kableExtra),    # tables
-  library(formattable),    # coloured cell in a table
-  library(keras)
+  library(wordcloud2),    #wordcloud
+  library(kableExtra),    #tables
+  library(formattable),   #coloured cell in a table
+  library(keras),
+  library(psych)          #For Cohen's Kappa psych::cohen.kappa()
   
 )
 
@@ -36,10 +37,13 @@ knitr::opts_chunk$set(
 
 load("~/Downloads/dsi-assign2/input_data.RData")
 load("~/Downloads/dsi-assign2/sentence_data.RData")
+load("~/Downloads/dsi-assign2/balanced_train_data.RData")
+load("~/Downloads/dsi-assign2/audrey/sentiment_all.Rdata")
+load("~/Downloads/dsi-assign2/vanessa/topic_matrix.RData")
 ```
 
 
-# **Description of the Problem**
+#### **Description of the Problem**
 
 We were given 30 State of the Nation (SONA) speeches from 1994 to 2018 to analyse. The specific objectives are to: 
 1. Infer sentiment and changes in sentiment over time  
@@ -48,7 +52,7 @@ We were given 30 State of the Nation (SONA) speeches from 1994 to 2018 to analys
 4. Evaluate out of sample performance of the predictions  
 
 
-# **Approach**  
+#### **Approach**  
 
 We collaborated using the following GitHub location: https://github.com/samperumal/dsi-assign2. 
 
@@ -82,9 +86,18 @@ Sam also assigned sentence id's using hashing and split the data into training a
 
 Before diving into any analysis, we felt it is important to do an Exploratory Data Analysis (EDA) to get a sense of the high level overview of the dataset. This was done by Audrey.
 
-### **Overview of the dataset**  
+#### **Overview of the dataset**  
 
-Each president has made a certain number of SONA speeches, depending on their term in office and whether there was 1 speech that year or 2 in the year of an election (pre and post election). Let's understand the number of words used by each President and how this varies across each SONA speech.  
+Each president has made a certain number of SONA speeches, depending on their term in office and whether there was 1 speech that year or 2 in the year of an election (pre and post election). Since the data is dependent on their term in the office it is unbalanced. Sentence counts per president after cleaning the data is :
+```{r}
+paste0("President sentence counts:")
+(table(input_data$sentences$president))
+paste0("Baseline_accuracies")
+(baseline_accuracies = table(input_data$sentences$president)*100/sum(table(input_data$sentences$president)))
+
+#Since the baseline accuracies as given above, as very unbalanced, it is expected that the majority classes will be predicted over the minority.
+```
+Let's understand the number of words used by each President and how this varies across each SONA speech. 
 
 #### **Average number of words used per President**  
 
@@ -139,11 +152,9 @@ avg_word_count %>%
 
 ```
   
-##### **Insights:**   
+## **Insights:**   
 
 On average, Mbeki used the most words in his SONA speeches, followed by Motlanthe and de Klerk used the least. Mandela and Zuma are ranked in the middle of their peers. The current president (Ramaphosa) used fewer words than all of his post 1994 peers.  
-
-
 
 #### **Number of words used per SONA**  
 
@@ -163,13 +174,13 @@ word_count %>%
 
 ```
   
-##### **Insights:**   
+## **Insights:**   
 
 Of the 3 presidents that have made more than 1 SONA speech, Mbeki used more words on average than both Mandela and Zuma and the variance in the number of words used per SONA speech is also higher for Mbeki. In 2004, which was an election year, the average number of words Mbeki used was lower in both his pre- and post-election speeches. Towards the end of his term, his average number of words also dropped off. The data suggests that perhaps Mbeki's average number of words is correlated with his confidence in being re-elected President.  
 
 
 
-### **What are the common words used across all SONA speeches?**  
+#### **Common words used across all SONA speeches**  
 
 ```{r}
 
@@ -181,12 +192,12 @@ wordcloud2(word_count[1:300, ], size = .6, color='random-dark')
 
 ```
   
-##### **Insights:**   
+## **Insights:**   
 
 ....  
 
 
-### **What are the common bigrams used across all SONA speeches?**  
+#### **Common bigrams used across all SONA speeches**  
 
 ```{r}
 
@@ -198,13 +209,13 @@ wordcloud2(bigram_count[1:300, ], size = .8, color='random-dark')
 
 ```
   
-##### **Insights:**   
+## **Insights:**   
 
 ....
 
 
 
-### **Lexical Diversity per President**  
+#### **Lexical Diversity per President**  
 
 Lexical diversity refers to the number of unique words used in each SONA.
 
@@ -229,7 +240,7 @@ diversity_per_year %>%
 
 ```
   
-##### **Insights:**   
+## **Insights:**   
 
 The number of unique words per SONA ranges from about 700 with de Klerk in 1994 to over 2500 with Mandela in his post election speech of 1999. Mbeki's post election speech of 2004 and Zuma's post election speech of 2014 also got close to the 2500 mark.  
 
@@ -239,7 +250,7 @@ If we exclude the post election speeches, the number of unique words used by Mbe
 
 
 
-### **Lexical Density per President**  
+#### **Lexical Density per President**  
 
 Lexical density refers to the number of unique words used in each SONA divided by the total number of words and a high value is an indicator of word repitition.  
 
@@ -264,7 +275,7 @@ density_per_year %>%
 
 ```
   
-##### **Insights:**   
+## **Insights:**   
 
 De Klerk repeated over 30% of his words in his 1994 pre election SONA speech. On average, Mandela repeated about 25% of words in each of his SONA speeches and this reduced to about 20% in the post election speech of 1999. Mbeki's repitition rate was about 23% and this reduced to 20% in the post election speech of 2004. Zuma's repitition rate is over 30% with the exception of his post election speech of 2014 at about 23%.  
 
@@ -272,22 +283,31 @@ De Klerk repeated over 30% of his words in his 1994 pre election SONA speech. On
 
 # **Results**
 
-Bag of Words Model
 
 
 
-## **Sentiment Analysis**
+#### **Sentiment Analysis**
 
 ```{r sentiment}
 
 # audrey
 
 ```
-## **Bag of Words Neural Net**
+## **Topic Modelling**
+
+```{r topic}
+
+# vanessa
+
+```
+#### **Neural Nets **
+
+### **Neural Net with Bag of Words Data**
 
 The count of each word that have been used in each sentence is what we are going to be feeding in. We need to unnest the sentence data, count each word in each sentence and spread the sentence word counts so that we have sentence id's in each row and we have each word as column id's. This is the simplest neural net model that we can try, so that was our first model.
 
 ```{r}
+library(RcppParallel)
 #Unnest words and count
 president_word_count = input_data$sentences %>%
   group_by(president) %>%
@@ -356,7 +376,8 @@ model %>% fit(x_train, y_train, epochs = 10, batch_size = 32, validation_data = 
 ) %>% plot()
 
 #Evaluate the model
-model %>% evaluate(x_test, y_test, batch_size=32, verbose = 1) #0.55886
+(test_accuracy_wordcount_bigger = model %>% evaluate(x_test, y_test, batch_size=32, verbose = 1)) #0.55886
+(train_accuracy_wordcount_bigger = model %>% evaluate(x_train, y_train, batch_size=32, verbose = 1))
 ```
 This model has L2 regularization to avoid overfitting but even so it didn't help very much. The accuracy is 0.55886. The optimizer_rmsprop has learning rate 0.003. This was choosen after trying lr=c(0.001, 0.002, 0.003) To make readability easier the model with best learning rate is used. 
 
@@ -370,7 +391,7 @@ model %>%
   layer_dense(units = 16, activation = 'relu', input_shape = ncol(x_train)) %>%
   layer_dropout(0.03) %>%
   layer_dense(units = 16, activation = 'relu', 
-              kernel_regularizer = regularizer_l2(0.01)) %>%  #Dense layer with L2 regulerizer 
+              kernel_regularizer = regularizer_l2(0.01)) %>%  #Dense layer with L2 regularizer 
   layer_dropout(0.01) %>%
   layer_dense(units = 6, activation = 'softmax') %>%       #6 neurons since we have six presidents
   compile(
@@ -386,7 +407,12 @@ model %>% fit(x_train, y_train, epochs = 10, batch_size = 32, validation_data = 
 ) %>% plot()
 
 model %>% evaluate(x_test, y_test, batch_size=32, verbose = 1) #0.5811648
+
+#Test and Train Accuracies
+(test_accuracy_wordcount_smaller = model %>% evaluate(x_test, y_test, batch_size=32, verbose = 1)) #0.5811648
 #This smaller model gave a better accuracy result than the one that has no dropout 
+
+(train_accuracy_wordcount_smaller = model %>% evaluate(x_train, y_train, batch_size=32, verbose = 1))
 
 #Get the predictions for the model
 predictions <- model %>% predict(x_test)
@@ -408,15 +434,30 @@ pres.actual = as.data.frame(pres.actual, ncol=1)
 predictions_val <- cbind(test_sona, pres.actual, pres.max)
 predictions_val = predictions_val %>% select(prez, pres.actual, pres.max)
 
+#We can see each presidents' classifications individually by filtering
+head(predictions_val %>% filter(prez == "Mbeki") %>% select(pres.max, pres.actual)) #President numero 1
+head(predictions_val %>% filter(prez == "Zuma") %>% select(pres.max, pres.actual)) #President numero 2
+head(predictions_val %>% filter(prez == "Mandela") %>% select(pres.max, pres.actual)) #President numero 3
+head(predictions_val %>% filter(prez == "Motlanthe") %>% select(pres.max, pres.actual)) #President numero 4
+head(predictions_val %>% filter(prez == "Ramaphosa") %>% select(pres.max, pres.actual)) #President numero 5
+head(predictions_val %>% filter(prez == "deKlerk") %>% select(pres.max, pres.actual))#President numero 6
 
-table <- table(predictions_val$pres.actual, predictions_val_2$pres.max)
+(predictions_val %>% select(prez, pres.actual) %>% unique %>% arrange(-desc(pres.actual)))
+
+
+table_bow <- table(predictions_val$pres.actual, predictions_val$pres.max)
 paste0("Accuracy rate is:" ,round((sum(diag(table))/sum(table)),4))
+```
+#**Cohen's Kappa**
 
+Kappa value tells you how much better your classifier is performing over the performance of a classifier that simply guesses at random according to the frequency of each class.
 
+"Cohen¢s kappa is always less than or equal to 1. Values of 0 or less, indicate that the classifier is useless. There is no standardized way to interpret its values. Landis and Koch (1977) provide a way to characterize values. According to their scheme a value < 0 is indicating no agreement , 0???0.20 as slight, 0.21???0.40 as fair, 0.41???0.60 as moderate, 0.61???0.80 as substantial, and 0.81???1 as almost perfect agreement."
+[Reference: Landis, J.R.; Koch, G.G. (1977). ???The measurement of observer agreement for categorical data???. Biometrics 33 (1): 159???174]
+
+```{r}
 # Calculate kappa by hand
-t = as.matrix(table)
-kappa(t)
-
+t = as.matrix(table_bow)
 
 t = cbind(t, "4" = colSums(t)/sum(colSums(t)))
 t = rbind(t, "7" = rowSums(t)/sum(rowSums(t)))
@@ -427,7 +468,14 @@ prob_b = (t[7,1]*t[1,4]) + (t[7,2]*t[2,4]) +(t[7,3]*t[3,4])
 
 k = (prob_a - prob_b)/(1-prob_b)
 
-paste0("Kappa value is ", round(k, 3), ", and this means the results have no agreement!")
+paste0("Kappa value is ", round(k, 3), ", and this means we are doing better than random")
+
+#Calculate kappa using a cohen.kappa()
+
+table_bow = cbind(table_bow, "4" = rep(0, 6), "5" = rep(0, 6),"6" = rep(0, 6))#make it square
+#As we have seen from the table above the nn did not predict anything for the minority classes so we have to cbind zeros as 4th,5th,6th columns. Because we need a square matrix for calculating Cohen's Kappa when using cohen.kappa() function.
+library(psych)
+cohen.kappa(table_bow)[1]
 
 ```
 
@@ -436,12 +484,11 @@ Just for the word-count model seems good enough. But this model does not conside
 
 After the fourth iteration validation loss starts increasing which is a sign of overfitting. 
 
-## **Bag of Words NN using tf-idf**
+## **Neural Net with tf-idf Data**
 
 TFIDF is a statisic that shows how important a word is to it's corpus. So if we are feeding NN with TFIDF we are logically expecting the results to be slightly better than the word-cout NN model. 
 
 ```{r tfidf}
-
 tidy_sona = input_data$sentences %>%
   unnest_tokens(word, sentence, token = "words") %>% 
   select(id, word, year, president) 
@@ -459,10 +506,12 @@ sona_tf_idf <- sona_tdf %>%
 
 #Get presidents names where id's match
 nm <- c("id", "president")
+df = input_data$sentences
 sona_tf_idf[nm] <- lapply(nm, function(x) df[[x]][match(sona_tf_idf$id, df$id)])
 
 
 # Spreading the data
+
 tf_idf_wide <- sona_tf_idf %>% 
   select(ID = id, prez = president, word, tf_idf) %>%  # note the change, using tf-idf
   spread(key = word, value = tf_idf, fill = 0)
@@ -518,9 +567,12 @@ model %>%
 model %>% fit(x_train, y_train, epochs = 10, batch_size = 32, validation_data = list(x_test, y_test)
 ) %>% plot()
 
-model %>% evaluate(x_test, y_test, batch_size=32, verbose = 1) #0.6146221 accuracy rate
 
+#Test and Training Accuracies
+(train_accuracy_tfidf = model %>% evaluate(x_train, y_train))$acc
+(test_accuracy_tfidf = model %>% evaluate(x_test, y_test))$acc #0.6146221 test accuracy
 
+#Get predictions
 predictions <- model %>% predict(x_test)
 predictions2 = model %>% predict_classes(x_test)
 range(predictions)
@@ -540,26 +592,31 @@ pres.actual = as.data.frame(pres.actual, ncol=1)
 predictions_val <- cbind(test_sona, pres.actual, pres.max)
 predictions_val = predictions_val %>% select(prez, pres.actual, pres.max)
 
+#We can see each presidents' classifications individuallyby filtering
+head(predictions_val %>% filter(prez == "Mbeki") %>% select(pres.max, pres.actual)) #President numero 1
+head(predictions_val %>% filter(prez == "Zuma") %>% select(pres.max, pres.actual)) #President numero 2
+head(predictions_val %>% filter(prez == "Mandela") %>% select(pres.max, pres.actual)) #President numero 3
+head(predictions_val %>% filter(prez == "Motlanthe") %>% select(pres.max, pres.actual)) #President numero 4
+head(predictions_val %>% filter(prez == "Ramaphosa") %>% select(pres.max, pres.actual)) #President numero 5
+head(predictions_val %>% filter(prez == "deKlerk") %>% select(pres.max, pres.actual))#President numero 6
 
-table <- table(predictions_val$pres.actual, predictions_val_2$pres.max)
+(predictions_val %>% select(prez, pres.actual) %>% unique %>% arrange(-desc(pres.actual)))
+
+
+table_tfidf <- table(predictions_val$pres.actual, predictions_val$pres.max)
 paste0("Accuracy rate is:" , round((sum(diag(t))/sum(t)),4))
-
-# Calculate kappa by hand
-t = as.matrix(table)
-t = cbind(t, "4" = colSums(t)/sum(colSums(t)))
-t = rbind(t, "7" = rowSums(t)/sum(rowSums(t)))
-t[7,4] = 0
-
-prob_a = sum(diag(table))/sum(colSums(table))
-prob_b = (t[7,1]*t[1,4]) + (t[7,2]*t[2,4]) +(t[7,3]*t[3,4])
-
-k = (prob_a - prob_b)/(1-prob_b)
-
-paste0("Kappa value is ", round(k, 3), ", and this means the results have no agreement!")
-
 ```
-###Neural Nets with Sentiment Analysis Data
+#**Cohen's Kappa**
 ```{r}
+table_tfidf = cbind(table_tfidf, "4" = rep(0, 6), "5" = rep(0, 6),"6" = rep(0, 6))#make it square
+
+library(psych)
+cohen.kappa(table_tfidf)[1] #Doing slightly better than random classifier.
+```
+The accuracy is 0.6158 and the model starts overfitting after fourth epoch. So this is slightly better than the bag of words word-count model as we expected.
+
+###**Neural Net with Sentiment Analysis Data**
+```{r nnwith}
 #The preparation of this file can be found in the same directory as the .Rdata file.
 load("~/Downloads/dsi-assign2/audrey/sentiment_all.Rdata")
 
@@ -615,16 +672,59 @@ model %>%
     metrics = c('accuracy')
   )
 
-model %>% fit(x_train, y_train, epochs = 10, batch_size = 32 ,validation_data = list(x_test, y_test)) %>% plot()
+model %>% fit(x_train, y_train, epochs = 20, batch_size = 32 ,validation_data = list(x_test, y_test)) %>% plot()
 
-(accuracy_sentiment = (model %>% evaluate(x_test, y_test))$acc)
+#Test and Training Accuracies
+(test_accuracy_sentiment = (model %>% evaluate(x_test, y_test))$acc)
+#Training accuracy
+(train_accuracy_sentiment = (model %>% evaluate(x_train, y_train))$acc)
+
 
 paste0("Accuracy of sentiment analysis is ", round(accuracy_sentiment,3))
-```
-Sentiment analysis also reaches it's smallest validation loss value on the second iteration. But the train accuracy and test accuracy is changing very slightly at each iteration. This model does not seem to be doing well on eighter the training set or the test set.
 
-### Neural Nets with Topic Modelling Gamma Values
+#Get the predictions
+predictions <- model %>% predict(x_test)
+predictions2 = model %>% predict_classes(x_test)
+range(predictions)
+range(predictions2)
+
+
+#Getting the max of each rows prediction and binding it on the end
+pres.max <- as.data.frame(predictions)
+pres.max <- apply(predictions,1,which.max) 
+pres.max <- unlist(as.numeric(as.character(pres.max)))
+pres.max <- cbind(predictions,pres.max )
+
+pres.actual <- as.data.frame(y_test)
+pres.actual <- apply(y_test,1,which.max) 
+pres.actual = as.data.frame(pres.actual, ncol=1)
+
+predictions_val <- cbind(test_sona, pres.actual, pres.max)
+predictions_val = predictions_val %>% select(president, pres.actual, pres.max)
+
+predictions_val %>% filter(president == "Mandela") %>% select(pres.actual, pres.max)
+(predictions_val %>% select(president, pres.actual) %>% unique %>% arrange(-desc(pres.actual)))
+
+(table_sentiment <- table(actual = predictions_val$pres.actual, pred = predictions_val$pres.max))
+paste0("Accuracy rate is:" , round((sum(diag(t))/sum(t)),4))
+
+```
+
+
+#**Cohen's Kappa**
+
 ```{r}
+
+table_sentiment = cbind(table_sentiment,"3"=rep(0,6), "4" = rep(0, 6), "5" = rep(0, 6),"6" = rep(0, 6))
+library(psych)
+cohen.kappa(table_sentiment)[1]
+
+```
+Sentiment analysis also reaches it's smallest validation loss value on the fifth iteration. But the train accuracy and test accuracy is changing very slightly at each iteration. This model does not seem to be doing well on eighter the training set or the test set. The test accuracy is 0.4361834 and the training accuracy is 0.4353395. If we look at the NRC sentiment lexicon it is visible that all presidents share same sentiment distribution pattern, so this is why it is not overfitting. Because our set aside test set is actually no different than the training set.
+
+###**Neural Nets with Topic Modelling Data (Gamma Values)**
+```{r}
+#The preparation of this topic_matrix can be found in the 
 load("~/Downloads/dsi-assign2/vanessa/topic_matrix.RData")
 
 sona_gamma = topic_matrix
@@ -646,7 +746,6 @@ training_sona <- sona_gamma %>%
 test_sona <- sona_gamma %>% 
   anti_join(training_ids, by = "id") %>%
   select(-id)
-
 
 # Seperate response variable
 dim(sona_gamma) #6626 rows 10626 cols
@@ -676,7 +775,7 @@ model <- keras_model_sequential() #Creating an empty sequential model
 
 model %>%
   layer_dense(units = 16, activation = 'relu', input_shape = ncol(x_train)) %>%
-  layer_dense(units = 16, activation = 'relu', kernel_regularizer = regularizer_l1_l2(l1 = 0.01, l2 = 0.01),    bias_initializer = initializer_glorot_normal()) %>%
+  layer_dense(units = 16, activation = 'relu', kernel_regularizer = regularizer_l1_l2(l1 = 0.01, l2 = 0.01),    bias_initializer = initializer_glorot_normal()) %>% #added some bias
   layer_dense(units = 6, activation = 'softmax') %>%
   compile(
     loss = 'categorical_crossentropy',
@@ -686,20 +785,72 @@ model %>%
 
 model %>% fit(x_train, y_train, epochs = 10, batch_size = 32, validation_data = list(x_test, y_test)) %>% plot()
 
-model %>% evaluate(x_test, y_test)
+#Test and Training Accuracies
+(train_accuracy_topic = model %>% evaluate(x_train, y_train))$acc
+(test_accuracy_topic = model %>% evaluate(x_test, y_test))$acc
 
-topic_matrix %>% left_join(sentiment_all)
+
+#Get predictions
+predictions <- model %>% predict(x_test)
+predictions2 = model %>% predict_classes(x_test)
+range(predictions)
+range(predictions2)
+
+
+#Getting the max of each rows prediction and binding it on the end
+pres.max <- as.data.frame(predictions)
+pres.max <- apply(predictions,1,which.max) 
+pres.max <- unlist(as.numeric(as.character(pres.max)))
+pres.max <- cbind(predictions,pres.max )
+
+pres.actual <- as.data.frame(y_test)
+pres.actual <- apply(y_test,1,which.max) 
+pres.actual = as.data.frame(pres.actual, ncol=1)
+
+predictions_val <- cbind(test_sona, pres.actual, pres.max)
+predictions_val = predictions_val %>% select(president, pres.actual, pres.max)
+
+(predictions_val %>% select(president, pres.actual) %>% unique %>% arrange(-desc(pres.actual)))
+(table_topic <- table(actual = predictions_val$pres.actual, pred = predictions_val$pres.max))
+paste0("Accuracy rate is:" , round((sum(diag(t))/sum(t)),4))
 ```
+Topic modelling only predicted for president 1(Mbeki) and president 2(Zuma).
 
-###GloVe word embeddings
-We will be using GloVe embeddings. GloVe is an unsupervised learning algorithm for obtaining vector representations for words. Training is performed on aggregated global word-word co-occurrence statistics from a corpus, and the resulting representations showcase interesting linear substructures of the word vector space." 
-GloVe stands for "Global Vectors for Word Representation". It's a popular embedding technique.
+#**Cohen's Kappa**
+```{r}
+
+table_topic = cbind(table_topic,"3"=rep(0,6), "4" = rep(0, 6), "5" = rep(0, 6),"6" = rep(0, 6))#make it square
+library(psych)
+cohen.kappa(table)[1] #it is doing fairly better than a randomly guessing classifier.
+
+```
+The train and the test set are not very distinct from each other just like sentiment analysis. 
+If we look at the mixture of the topics by each president in topic modelling chunk we can see that all the topics for each president are kind of uniformed and hard to seperate each president's topic from one another.
+
+###**CNN with Transfer Learning \n(Pre-trained Embeddings)**
+
+We will be using GloVe embeddings. GloVe stands for "Global Vectors for Word Representation" and is an unsupervised learning algorithm for obtaining vector representations for words as it is stated in their website. Training is performed on aggregated global word-word co-occurrence statistics from a corpus, and the resulting representations showcase interesting linear substructures of the word vector space.
 [Reference:Jeffrey Pennington, Richard Socher, and Christopher D. Manning. 2014. GloVe: Global Vectors for Word Representation:https://nlp.stanford.edu/pubs/glove.pdf ]
 Specifically, we will use the 100-dimensional GloVe embeddings of 400k words computed on a 2014 dump of English Wikipedia. 
-reference: https://blog.keras.io/using-pre-trained-word-embeddings-in-a-keras-model.html
-reference: https://keras.rstudio.com/reference/save_text_tokenizer.html
+
+This note is taken from the reference given above and as they state the accuracy they achieved on python is twice as good.
+
+"IMPORTANT NOTE:This example does yet work correctly. The code executes fine and appears to mimic the Python code upon which it is based however it achieves only half the training accuracy that the Python code does so there is clearly a subtle difference. We need to investigate this further before formally adding to the list of examples"
+
+[reference for implementation on Python: https://blog.keras.io/using-pre-trained-word-embeddings-in-a-keras-model.html]
+[reference for implementation on R: https://keras.rstudio.com/articles/examples/pretrained_word_embeddings.html]
+[reference for implementation on R: https://github.com/rstudio/keras/blob/master/vignettes/examples/pretrained_word_embeddings.R]
+
+
+Also for the pre-trained embeddings to work well it needs to be trained with similar type of data that you are trying to classify, and the fact that the GloVe embeddings are trained on Wikipedia data one can expect that it would not neccesarily help predict the presidents better for our sentences.
+
 ```{r}
 library(keras)
+
+#Load the data we are going to be embedding
+load("~/Downloads/dsi-assign2/input_data.RData")
+load("~/Downloads/dsi-assign2/balanced_train_data.RData")
+load("~/Downloads/dsi-assign2/sentence_data.RData")
 
 #Settings for gloves embedding
 GLOVE_DIR <- 'glove.6B'
@@ -747,12 +898,8 @@ tokenizer %>% fit_text_tokenizer(input_data$sentences$sentence)
 
 # save the tokenizer in case we want to use it again
 # for prediction within another R session, see:
-# 
-#https://blog.keras.io/using-pre-trained-word-embeddings-in-a-keras-model.html
+# https://keras.rstudio.com/reference/save_text_tokenizer.html
 save_text_tokenizer(tokenizer, "tokenizer")
-
-# If you want to use the same text tokenizer use this:
-# load_text_tokenizer("tokenizer")
 
 sequences_train = texts_to_sequences(tokenizer, balanced_train_data$sentence)
 sequences_valid = texts_to_sequences(tokenizer, sentence_data$validate$sentence)
@@ -774,10 +921,10 @@ response_tokenizer$fit_on_texts(sentence_data$validate$president )
 y_train = (response_tokenizer$texts_to_matrix(balanced_train_data$president, mode = "binary"))[,-1]
 y_val = (response_tokenizer$texts_to_matrix(sentence_data$validate$president , mode = "binary"))[,-1]
 
-cat('Shape of data tensor: ', dim(data_train), '\n')
-cat('Shape of data tensor: ', dim(data_valid), '\n')
+cat('Shape of data tensor: ', dim(x_train), '\n')
+cat('Shape of data tensor: ', dim(x_val), '\n')
 cat('Shape of label tensor: ', dim(y_train), '\n')
-cat('Shape of data tensor: ', dim(y_test), '\n')
+cat('Shape of data tensor: ', dim(y_val), '\n')
 
 
 # prepare embedding matrix
@@ -840,22 +987,17 @@ model %>% compile(
 model %>% fit(
   x_train, y_train,
   batch_size = 128,
-  epochs = 15,
+  epochs = 11,
   validation_data = list(x_val, y_val)
 ) %>% plot()
 
-#Since the validation loss is still decreasing and the accuracy was increasing we will run 5 more epochs
-model %>% 
-  fit(x_train, y_train, epochs = 5, batch_size = 128,validation_data = list(x_val, y_val)) %>% 
-  plot()
+#Test and Training Accuracies
+(test_accuracy_transferlearn = model %>% evaluate(x_val, y_val))$acc
+(train_accuracy_transferlearn = model %>% evaluate(x_train, y_train))$acc
 
-model %>% evaluate(x_val, y_val)
-#The accuracy results are improved by 2% when using the balanced data set(see dsi-assign2/merve/pre-trained-embeddings-final), so this says that there might be a better way to balance the data like **smote** 
-#The accuracy of the 0.4479554
-#As mentioned in the important note part in Keras' website, this code mimics the python code but it is half as successful, so they are pointing this issue there. See: https://github.com/rstudio/keras/blob/master/vignettes/examples/pretrained_word_embeddings.R
-
-
+#Getting the predictions:
 predictions <- model %>% predict(x_val)
+
 range(predictions)
 
 
@@ -868,25 +1010,35 @@ pres.max <- cbind(predictions,pres.max )
 pres.actual <- as.data.frame(y_val)
 pres.actual <- apply(y_val,1,which.max) 
 
-
 predictions_val <- cbind(sentence_data$validate,pres.max,pres.actual)
-View(head(predictions_val, n= 100))
-predictions_val %>% filter(president == "Mbeki")
 
-t = table(predictions_val$pres.max, predictions_val$pres.actual)
+#We can see each presidents' classifications individuallyby filtering
+head(predictions_val %>% filter(president == "Mbeki") %>% select(pres.max, pres.actual)) #President numero 1
+head(predictions_val %>% filter(president == "Zuma") %>% select(pres.max, pres.actual)) #President numero 2
+head(predictions_val %>% filter(president == "Mandela") %>% select(pres.max, pres.actual)) #President numero 3
+head(predictions_val %>% filter(president == "Motlanthe") %>% select(pres.max, pres.actual)) #President numero 4
+head(predictions_val %>% filter(president == "Ramaphosa") %>% select(pres.max, pres.actual)) #President numero 5
+head(predictions_val %>% filter(president == "deKlerk") %>% select(pres.max, pres.actual))#President numero 6
 
+(t = table(pred = predictions_val$pres.max, actual = predictions_val$pres.actual))
+paste0("President sentence counts in validation set:")
+(table(sentence_data$validate$president))
+paste0("Baseline_accuracies")
+(baseline_accuracies = table(input_data$sentences$president)*100/sum(table(input_data$sentences$president)))
+```
+Majority of the sentences of Mbeki is predicted as Mandela(379/569).
+Majority of the sentences of Zuma is predicted as Mandela (244/534) and the secon majority is predicted as himself (195/534).
+Majority of the sentences of Mandela is predicted as Mandela(263/381).
+Majority of the sentences of Mothlane(38/66) is predicted as Mandela.
+Majority of sentences of Ramaphosa is predicted as Mandela(19/47) or Zuma(15/47).
+Mojority of the sentences of deKlerk is predicted as Mandela(14/17).
 
+##**Cohen's Kappa**
+```{r}
+library(psych)
+cohen.kappa(t) #0.116 #We are doing slightly better than random classifier.
 ```
 
-
-
-## **Topic Modelling**
-
-```{r topic}
-
-# vanessa
-
-```
 
 
 
@@ -895,21 +1047,39 @@ t = table(predictions_val$pres.max, predictions_val$pres.actual)
 
 ```{r nn}
 
-# sam / merve??
+# sam / merve?? 
+# merve says: I have actually done my predictions within chunks, so we can remove this part. Votes?
+
+paste0("Test accuracy for the bigger word-count model is ", test_accuracy_wordcount_bigger$acc) #0.55886
+paste0("Train accuracy for the bigger word-count model is ", train_accuracy_wordcount_bigger$acc)
+
+paste0("Test accuracy for the smaller word-count model is ", test_accuracy_wordcount_smaller$acc) #0.5811648
+paste0("Train accuracy for the smaller word-count model is ", train_accuracy_wordcount_smaller$acc)
+
+paste0("Test accuracy for the tf-idf model is ", test_accuracy_tfidf$acc) #0.6146221
+paste0("Train accuracy for the tf-idf model is ", train_accuracy_tfidf$acc)
+
+paste0("Test accuracy for the sentiment analysis nn is ", test_accuracy_sentiment$acc) #
+paste0("Train accuracy for the sentiment analysis nn is ", train_accuracy_sentiment$acc)
+
+paste0("Test accuracy for the topic modelling nn is ", test_accuracy_topic$acc) #
+paste0("Train accuracy for the topic modelling nn is ", train_accuracy_topic$acc)
+
+paste0("Test accuracy for the transfer learning CNN is ", test_accuracy_transferlearn$acc) #0.4634449
+paste0("Train accuracy for the transfer learning CNN is ", train_accuracy_transferlearn$acc)
+
 
 ```
 
-
-
 ### **Evaluate Out of Sample Performance**
 
-
+test_acc
 
 ## **Convolutional Neural Net (cnn) to predict the President from a Sentence**
 
 ```{r cnn}
 
-# ??
+# ?? Also done this part inside the chunks, thought it was easier to see that way.
 
 ```
 
@@ -931,10 +1101,11 @@ t = table(predictions_val$pres.max, predictions_val$pres.actual)
 
 #### **Evaluate Out of Sample Performance**
 
-
+here we can combine all the train and test accuracies in a table, as a conclusion.
 
 ## **Analysis of Results and Conclusion**
 
+Also done the critisism after each chunk. 
 
 
 ## **References**
@@ -943,5 +1114,12 @@ https://www.kaggle.com/rtatman/tutorial-sentiment-analysis-in-r
 
 https://www.datacamp.com/community/tutorials/sentiment-analysis-R
 
+https://nlp.stanford.edu/pubs/glove.pdf 
 
+https://blog.keras.io/using-pre-trained-word-embeddings-in-a-keras-model.html
 
+https://keras.rstudio.com/articles/examples/pretrained_word_embeddings.html
+
+https://github.com/rstudio/keras/blob/master/vignettes/examples/pretrained_word_embeddings.R
+
+Landis, J.R.; Koch, G.G. (1977). ???The measurement of observer agreement for categorical data???. Biometrics 33 (1): 159???174

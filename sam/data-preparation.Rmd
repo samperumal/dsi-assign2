@@ -1,5 +1,5 @@
 ---
-title: "DataPreProcess"
+title: "Data Preparation"
 output: html_document
 ---
 
@@ -33,3 +33,10 @@ Exclude leading header text, due to commonality between speeches
 
 Remove sentences common to 2 or more speeches
 
+# Data Sampling
+
+80% train, 20% validation
+
+Data is very unbalanced by president, so attempt to balance by supersampling from low sentence count presidents to ensure 
+each president has an equal number of sentences. Achieved by using sampling with replacement from 80% train data only (to ensure 
+there are no duplicates in the validation set that might skew validation error).

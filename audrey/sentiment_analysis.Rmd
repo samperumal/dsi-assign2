@@ -170,7 +170,8 @@ tidy_sona_words %>%
   coord_flip() + 
   xlab("") +
   facet_grid(.~ president) +
-  ggtitle("Positive Words most used across Presidents")
+  ggtitle("Positive Words most used across Presidents") +
+  theme(axis.text.x=element_text(size=6, angle = 90))
 
 ```
   
@@ -240,7 +241,8 @@ tidy_sona_words %>%
   coord_flip() + 
   xlab("") +
   facet_grid(.~ president) +
-  ggtitle("Negative Words most used across Presidents")
+  ggtitle("Negative Words most used across Presidents") +
+  theme(axis.text.x=element_text(size=6, angle = 90))
   
 ```
   
@@ -287,11 +289,9 @@ sentiments_relative %>%
   ggplot(aes(x = as.numeric(year), y = freq, colour = sentiment)) +
   geom_point() + geom_line() +
   geom_smooth(method = "loess", aes(colour = sentiment)) +
-  geom_vline(xintercept = 1994, color = "grey") +
-  geom_vline(xintercept = 1999, color = "grey") +
-  geom_vline(xintercept = 2004, color = "grey") +
-  geom_vline(xintercept = 2009, color = "grey") +
-  geom_vline(xintercept = 2014, color = "grey")
+  ggtitle("Trends in Positive and Negative Sentiment over time") +
+  scale_x_discrete(name ="year", 
+                    limits=c(1994,1999,2004,2009,2014))
 
 ```
   
@@ -299,7 +299,8 @@ sentiments_relative %>%
   
 The trend appears to be more positive and less negative over time but how can we be sure?
 
-We will test whether negative sentiment is increasing or decreasing, then we will test whether positive sentment is increasing or decreasing . We will use a Binomial model because the frequencies are between 0 and 1. Finally, we will test whether average sentiment is increasing or decreasing using a linear model.
+We will test whether negative sentiment is increasing or decreasing, then we will test whether positive sentment is increasing or decreasing . We will use a Binomial model because the frequencies are between 0 and 1. Finally, we will test whether average sentiment is increasing or decreasing using a linear model.  
+
 
 #### **Is negative sentiment increasing over time?**
 
@@ -312,11 +313,11 @@ summary(model_neg)
 
 **Insights:**   
   
-The slope is negative but the beta of the year variable is not significant so we cannot conclude that negative sentiment is decreasing over time.
+The slope is negative but the beta of the year variable is not significant so we cannot conclude that negative sentiment is decreasing over time.  
 
 
 
-#### **Is postive sentiment increasing over time?**
+#### **Is postive sentiment increasing over time?**  
 
 ```{r modelpos}
 
@@ -328,11 +329,11 @@ summary(model_pos)
   
 **Insights:**   
   
-The slope is positive but the beta of the year variable is not significant so we cannot conclude that positive sentiment is increasing over time.
+The slope is positive but the beta of the year variable is not significant so we cannot conclude that positive sentiment is increasing over time.  
+  
 
 
-
-#### **Is average sentiment increasing over time?**
+#### **Is average sentiment increasing over time?**  
 
 ```{r modelavg}
 
@@ -352,6 +353,14 @@ summary(model_avg)
 **Insights:**   
   
 The slope is positive and the beta of the year variable is significant at 1% so we can conclude that average sentiment is increasing over time.  
+
+But we need to be cautious with this interpretation because what could actually be going on here is that the "bing"" lexicon has more than double the number of negative words than positive words so this could be influencing the results and SONA speeches may in fact be more positive than they appear to be.
+
+```{r}
+
+table(get_sentiments('bing')$sentiment)
+
+```
 
 
 
@@ -399,17 +408,14 @@ sentiments_per_year %>%
   geom_point() + 
   geom_smooth(method = "loess", aes(colour = president)) +
   ggtitle("Change in bing Sentiment over time") +
-  geom_vline(xintercept = 1994, color = "grey") +
-  geom_vline(xintercept = 1999, color = "grey") +
-  geom_vline(xintercept = 2004, color = "grey") +
-  geom_vline(xintercept = 2009, color = "grey") +
-  geom_vline(xintercept = 2014, color = "grey")
+  scale_x_discrete(name ="year", 
+                    limits=c(1994,1999,2004,2009,2014))
 
 ```
   
 **Insights:**  
   
-
+Average sentiment is the proportion of positive words out of all the words in the "bing" lexicon. Mandela shows a very erratic average sentiment, ranging from 0 to over 25. Mbeki and Zuma's average sentiment mostly ranges between 25 and 50, with the exception of a few such as 2000, 2008, 2012, 2017. 
 
 
 
@@ -433,7 +439,20 @@ tidy_sona_words %>%
   
 **Insights:**  
   
-...
+The most number of words are scored positive 2, followed by positive 1. This becomes even more pronounced when scores are multiplied by counts to get weighted scores.
+  
+
+
+Let's check the distribution of all "afinn" words:
+
+```{r}
+
+table(get_sentiments('afinn')$score)
+
+```
+  
+Words with a score of -2 dominate the lexicon, followed by words with a score of 2. We found a relatively high number of words with a score of 2 in this analysis but it is unlikely to only be a result of its prevalence in the lexicon and we can conclude that it is probably an accurate assessment of the sentiment that prevails in the text.  
+
 
 
 #### **Distribution of "afinn" Sentiment per President**
@@ -460,7 +479,7 @@ ggplot(sentiments_per_year, aes(x = president, y = afinn_sentiment_perc, colour 
 
 **Insights:**    
   
-...
+The interpretation is much the same as with the "bing" lexicon in that the trend is an increasing average sentiment over time however Zuma's median sentiment is lower than the general trend.
 
 
 
@@ -473,14 +492,15 @@ sentiments_per_year %>%
   geom_point() + 
   geom_smooth(method = "loess", aes(colour = president)) +
   ggtitle("Change in afinn Sentiment over time") +
-  geom_vline(xintercept = 1994, color = "grey") +
-  geom_vline(xintercept = 1999, color = "grey") +
-  geom_vline(xintercept = 2004, color = "grey") +
-  geom_vline(xintercept = 2009, color = "grey") +
-  geom_vline(xintercept = 2014, color = "grey")
+  scale_x_discrete(name ="year", 
+                    limits=c(1994,1999,2004,2009,2014))
 
 ```
-
+  
+**Insights:**    
+  
+Mandela and Zuma show a wave-like pattern of sentiment. Mbeki shows an increasing and then decreasing pattern.
+  
 
 
 ### **Sentiment Analysis using "nrc" lexicon (infers emotion with certain words)**
@@ -513,9 +533,21 @@ tidy_sona_words %>%
   coord_flip()
 
 ```
+  
+Let's check the distribution of all "nrc" words:
 
-**Insights:**   
-...
+```{r}
+
+table(get_sentiments('nrc')$sentiment)
+
+```
+
+**Insights:**  
+   
+Words can be assigned more than 1 sentiment but we do not expect as many words to come up under "anticipation", "joy" or "surprise" given the relatively lower counts in the lexicon. So "anticipation" has a surprisingly high relative count across all presidents.  
+
+Given that "positive" sentiment is the most frequent classification in the "nrc" lexicon, it is not surprising that it comes out as the most frequently assigned classification across all presidents. The distributions across the various sentiments are very similar for all presidents so this lexicon does not provide any insights about specific presidents.
+    
 
 
 ### **Sentiment Analysis using "nrc" lexicon**
@@ -554,9 +586,62 @@ nrc_sentiment %>%
 ```
 
 
-### STILL TO DO:
-### Bigrams
-### Dealing with negation
+**Insights:**  
+   
+...  
+
+
+
+### Checking for Negation in Bigrams
+
+It just so happens that the 4 negation words are also stop words so have already been removed from our Bigrams. This can be shown as follows:
+
+```{r}
+
+negation_words <- c("not", "no", "never", "without")
+
+x <- which(stop_words$word == "not")      # this includes the pattern for "not"
+x <- append(x, which(stop_words$word == "no"), after=length(x))
+x <- append(x, which(stop_words$word == "never"), after=length(x))
+x <- append(x, which(stop_words$word == "without"), after=length(x))
+stop_words$word[x]
+
+```
+
+So we need to first deal with negation and then remove stop words:
+
+```{r negation}
+
+# start with the bigrams including stop words
+bigrams_ex_negation <- tidy_sona_sentences %>% 
+  unnest_tokens(bigram, sentence, token = "ngrams", n = 2) %>% 
+  # separate the bigrams
+  separate(bigram, c("word1", "word2"), sep = " ") %>% 
+  # add sentiment for word 1
+  left_join(get_sentiments("bing"), by = c(word1 = "word")) %>%
+  rename(sentiment1 = sentiment) %>%
+  mutate(sentiment1 = ifelse(is.na(sentiment1), "neutral", sentiment1)) %>%
+  # add sentiment for word 2
+  left_join(get_sentiments("bing"), by = c(word2 = "word")) %>%
+  rename(sentiment2 = sentiment) %>%
+  mutate(sentiment2 = ifelse(is.na(sentiment2), "neutral", sentiment2)) %>%
+  select(year,word1,word2,sentiment1,sentiment2,everything())
+
+# let's see how many there are
+filter(bigrams_ex_negation, word1 %in% negation_words) %>% 
+  select(year, word1, word2, sentiment1, sentiment2) %>% 
+  filter(sentiment2 != "neutral") %>%    # we are not interested in these
+  count()
+  
+```
+
+There are 118 bigrams that contain negation words. We need to reverse the sentiment of word 2.
+
+```{r}
+
+
+```
+
 
 
 
