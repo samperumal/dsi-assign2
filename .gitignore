@@ -25,8 +25,6 @@ vignettes/*.pdf
 # Shiny token, see https://shiny.rstudio.com/articles/shinyapps.html
 rsconnect/
 .Rproj.user
-<<<<<<< HEAD
 .RDataTmp
-=======
 glove.6B*
->>>>>>> befd04d1c60748886202d641821b6c12576e6ff9
+*_files/
