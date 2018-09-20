@@ -1,0 +1,135 @@
+---
+title: "Sentiment Data Prep for NN - stop words not removed"
+author: "Audrey Pentz"
+date: "September 15, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(
+  echo = TRUE,
+  library(tidyverse),
+  library(tidytext),
+  library(stringr),
+  library(lubridate),
+  library(knitr)
+)
+
+```
+
+
+
+## **Load the Preprocessed Data**
+
+```{r import}
+
+load("../input_data.RData")
+
+```
+
+
+
+## **Remove Stop Words and Tokenize by Sentences, Words and Bigrams**
+
+```{r tokenize}
+
+# sentence tokenization
+tidy_sona_sentences <- input_data$sentences
+
+# word tokenization
+tidy_sona_words <- input_data$words  # do not remove stop words for neutral net
+
+# bigram tokenization
+bigrams <- tidy_sona_sentences %>% 
+  unnest_tokens(bigram, sentence, token = "ngrams", n = 2)
+# separate the bigrams 
+bigrams_separated <- bigrams %>%
+  separate(bigram, c("word1", "word2"), sep = " ")
+# remove stop words
+bigrams_filtered <- bigrams_separated %>%
+  filter(!word1 %in% stop_words$word) %>%
+  filter(!word2 %in% stop_words$word)
+# join up the bigrams again
+tidy_sona_bigrams <- bigrams_filtered %>%
+  unite(bigram, word1, word2, sep = " ")
+
+# view data
+View(tidy_sona_sentences)
+View(tidy_sona_words)
+View(tidy_sona_bigrams)
+
+```
+
+
+
+## **Sentiment Analysis using "bing" lexicon ("positive" or "negative")**
+
+```{r bing}
+
+# bing sentiment per sentence
+bing_sentiment <- tidy_sona_words %>%
+  left_join(get_sentiments("bing")) %>%
+  group_by(president, year, election, id) %>% 
+  count(sentiment) %>%
+  mutate(sentiment = ifelse(is.na(sentiment), "not_in_bing_lexicon", sentiment)) %>% 
+  spread(sentiment, n, fill = 0) %>%
+  mutate(bing_sentiment = positive - negative,
+         total_words = positive + negative + not_in_bing_lexicon,
+         bing_sentiment_perc = round((bing_sentiment/(total_words)*100),2)) %>% 
+         # bing sentiment as a percentage of total words in the sentence
+  rename(bing_negative = negative, bing_positive = positive) %>%
+  ungroup()
+
+```
+
+
+## **Sentiment Analysis using "afinn" lexicon (scale from -5 negative to +5 positive)**
+
+```{r afinn}
+
+# afinn sentiment per sentence
+afinn_sentiment <- tidy_sona_words %>%
+  left_join(get_sentiments("afinn")) %>%
+  group_by(president, year, election, id) %>% 
+  count(score) %>% 
+  mutate(score = ifelse(is.na(score), 0, score),
+         total_words = sum(n),
+         afinn_sentiment = sum(score * n),   # weighted score
+         afinn_sentiment_perc = round((afinn_sentiment/total_words*100),2)) %>% 
+         # afinn sentiment as a percentage of total words in the sentence
+  spread(key = score, value = n, fill = 0) %>%
+  ungroup()
+
+```
+
+
+## **Sentiment Analysis using "nrc" lexicon (infers emotion with certain words)**
+
+```{r nrc}
+
+# nrc sentiment per sentence
+nrc_sentiment <- tidy_sona_words %>%
+  left_join(get_sentiments("nrc")) %>%
+  group_by(president, year, election, id) %>% 
+  count(sentiment) %>% 
+  mutate(sentiment = ifelse(is.na(sentiment), "not_in_nrc_lexicon", sentiment)) %>% 
+  spread(key = sentiment, n, fill = 0) %>% 
+  rename(nrc_negative = negative, nrc_positive = positive) %>%
+  ungroup()
+
+```
+
+
+## **Combining "bing", "afinn" and "nrc" sentiment**
+
+```{r all}
+
+sentiment_all <- bing_sentiment %>% 
+  left_join(afinn_sentiment) %>% 
+  left_join(nrc_sentiment)
+
+
+save(sentiment_all, file="sentiment_all.Rdata")
+```
+

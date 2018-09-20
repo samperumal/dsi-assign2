@@ -1,0 +1,221 @@
+---
+title: "Sentiment Data Prep for NN"
+author: "Audrey Pentz"
+date: "September 15, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(
+  echo = TRUE,
+  library(tidyverse),
+  library(tidytext),
+  library(stringr),
+  library(lubridate),
+  library(knitr)
+)
+
+```
+
+
+
+## **Read in the Data**
+
+```{r import}
+
+txt_files <- list.files("../sona-text-1994-2018/")
+
+sona <- data.frame(filename = as.character(), speech = as.character())
+for(i in txt_files){
+  file_name <- paste0("../sona-text-1994-2018/", i)
+  
+  # import text as single character string (can also read.table but the "seperator" causes problems)
+  this_speech <- readChar(file_name, 
+                          nchars = file.info(file_name)$size)
+  
+  # make data frame with metadata (filename contains year and pres) and speech
+  this_sona <- data.frame(filename = i, speech = this_speech, stringsAsFactors = FALSE)
+  
+  # make a single dataset
+  sona <- rbind(sona, this_sona)
+}
+
+# extract year
+sona$year <- str_sub(sona$filename, start = 1, end = 4)
+
+# extract president name
+sona$president <- unlist(str_extract_all(sona$filename, '(?<=_)[^_]+(?=.txt)'))
+# this finds everything between "_" and ".txt"
+
+```
+
+
+
+## **Remove Stop Words and Tokenize by Sentences, Words and Bigrams**
+
+```{r tokenize}
+
+# sentence tokenization
+tidy_sona_sentences <- input_data$sentences 
+# add an ID variable for sentences
+tidy_sona_sentences <- rowid_to_column(tidy_sona_sentences, "sentence_id")
+
+# word tokenization
+tidy_sona_words <- tidy_sona_sentences %>% 
+  unnest_tokens(word, sentence, token = "words") %>% 
+  filter(!word %in% stop_words$word, str_detect(word, "[a-z]"))  # remove stop words
+
+# bigram tokenization
+bigrams <- tidy_sona_sentences %>% 
+  unnest_tokens(bigram, sentence, token = "ngrams", n = 2)
+# separate the bigrams 
+bigrams_separated <- bigrams %>%
+  separate(bigram, c("word1", "word2"), sep = " ")
+# remove stop words
+bigrams_filtered <- bigrams_separated %>%
+  filter(!word1 %in% stop_words$word) %>%
+  filter(!word2 %in% stop_words$word)
+# join up the bigrams again
+tidy_sona_bigrams <- bigrams_filtered %>%
+  unite(bigram, word1, word2, sep = " ")
+
+```
+
+
+
+## **Sentiment Analysis using "bing" lexicon ("positive" or "negative")**
+
+```{r bing}
+
+# bing sentiment per sentence
+bing_sentiment <- tidy_sona_words %>%
+  left_join(get_sentiments("bing")) %>%
+  group_by(year, election, id) %>% 
+  count(sentiment) %>%
+  mutate(sentiment = ifelse(is.na(sentiment), "not_in_bing_lexicon", sentiment)) %>% 
+  spread(sentiment, n, fill = 0) %>%
+  mutate(bing_sentiment = positive - negative,
+         total_words = positive + negative + not_in_bing_lexicon,
+         bing_sentiment_perc = round((bing_sentiment/(total_words)*100),2)) %>% 
+         # bing sentiment as a percentage of total words in the sentence
+  ungroup() %>%
+ select(-positive, -negative)
+
+```
+
+
+## **Sentiment Analysis using "afinn" lexicon (scale from -5 negative to +5 positive)**
+
+```{r afinn}
+
+# afinn sentiment per sentence
+afinn_sentiment <- tidy_sona_words %>%
+  left_join(get_sentiments("afinn")) %>%
+  group_by(filename, sentence_id) %>% 
+  count(score) %>% 
+  mutate(score = ifelse(is.na(score), 0, score),
+         total_words = sum(n),
+         afinn_sentiment = sum(score * n),   # weighted score
+         afinn_sentiment_perc = round((afinn_sentiment/total_words*100),2)) %>% 
+         # afinn sentiment as a percentage of total words in the sentence
+  spread(key = score, value = n, fill = 0) %>% 
+  ungroup()
+
+```
+
+
+## **Sentiment Analysis using "nrc" lexicon (infers emotion with certain words)**
+
+```{r nrc}
+
+# nrc sentiment per sentence
+nrc_sentiment <- tidy_sona_words %>%
+  left_join(get_sentiments("nrc")) %>%
+  group_by(filename, sentence_id) %>% 
+  count(sentiment) %>% 
+  mutate(sentiment = ifelse(is.na(sentiment), "not_in_nrc_lexicon", sentiment)) %>% 
+  spread(key = sentiment, n, fill = 0) %>%
+  ungroup()
+
+```
+
+
+## **Sentiment Analysis using "nrc" lexicon (infers emotion with certain words)**
+
+```{r all}
+
+sentiment_all <- bing_sentiment %>% 
+  left_join(afinn_sentiment) %>% 
+  left_join(nrc_sentiment)
+sentiment_all
+
+sentiment_all$president = gsub(".*[_]([^.]+)[.].*", "\\1", (sentiment_all$filename))
+
+```
+
+```{r}
+save(sentiment_all, file="sentiment_all.Rdata")
+```
+
+```{r}
+
+load("~/Downloads/dsi-assign2/merve/sentiment_all.Rdata")
+
+set.seed(123)
+
+training_ids <- sentiment_all %>% 
+  group_by(president) %>% 
+  sample_frac(0.9) %>% 
+  ungroup() %>%
+  select(sentence_id)
+
+training_sona <- sentiment_all %>% 
+  right_join(training_ids, by = "sentence_id") %>%
+  select(-sentence_id)
+
+test_sona <- sentiment_all %>% 
+  anti_join(training_ids, by = "sentence_id") %>%
+  select(-sentence_id)
+
+
+# Seperate response variable
+dim(sentiment_all) #7286   31
+x_train <- as.matrix(training_sona %>% select(-president, -filename))
+x_test <- as.matrix(test_sona %>% select(-president, -filename))
+
+
+#One-hot encoding for response variable
+labels_test = test_sona %>% select(president) %>% unlist()
+president_count = labels_test %>% as_tibble() %>% unique() %>% count()
+response_tokenizer = text_tokenizer(num_words = president_count+1)
+response_tokenizer$fit_on_texts(labels_test)
+# Extract response vector, ignoring first (empty) column
+y_test = (response_tokenizer$texts_to_matrix(labels_test, mode = "binary"))[,-1]
+
+labels_train = training_sona %>% select(president) %>% unlist()
+president_count = labels_train %>% as_tibble() %>% unique() %>% count()
+response_tokenizer = text_tokenizer(num_words = president_count + 1)
+response_tokenizer$fit_on_texts(labels_train)
+# Extract response vector, ignoring first (empty) column
+y_train = (response_tokenizer$texts_to_matrix(labels_train, mode = "binary"))[,-1]
+
+model <- keras_model_sequential() #Creating an empty sequential model
+
+#Define a model by sequentially adding layers.
+
+model %>%
+  layer_dense(units = 16, activation = 'relu', input_shape = ncol(x_train)) %>%
+  layer_dense(units = 16, activation = 'relu', kernel_regularizer = regularizer_l1_l2(l1 = 0.01, l2 = 0.01), bias_initializer = initializer_glorot_normal()) %>%
+  layer_dense(units = 6, activation = 'softmax') %>%
+  compile(
+    loss = 'categorical_crossentropy',
+    optimizer = optimizer_rmsprop(lr = 0.003),
+    metrics = c('accuracy')
+  )
+
+model %>% fit(x_train, y_train, epochs = 10, batch_size = 32 ) %>% plot()
+
+model %>% evaluate(x_test, y_test)
+```
+
