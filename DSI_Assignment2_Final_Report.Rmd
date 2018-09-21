@@ -6,7 +6,9 @@ author:
 - Sameshan Perumal
 - Vanessa Saker
 date: "20 September 2018"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 
@@ -69,7 +71,7 @@ We initially split the work as follows and each of us created a folder with our 
 
 We presented our work to each other and made suggestions for improvement. Before diving into any prediction, we felt it was important to do an Exploratory Data Analysis (EDA) to get a sense of the high level overview of the dataset. This was done by Audrey.
 
-The initial results from the Neural Net gave a 65% accuracy on the validation set. In order to  achieve a higher accuracy, we attempted to feed the results of the Topic Modelling and Sentiment Analysis into the Neural Net. Thus, we needed to understand from each other what the output of these 2 methods were and the input required by the neural net to get the data into a useable format which took some discussion and a few iterations.
+The initial results from the Neural Net gave a 63% accuracy on the validation set. In order to  achieve a higher accuracy, we attempted to feed the results of the Topic Modelling and Sentiment Analysis into the Neural Net. Thus, we needed to understand from each other what the output of these 2 methods were and the input required by the neural net to get the data into a useable format which took some discussion and a few iterations.
 
 Given the low accuracy of the neural net (NN), we tried a Convolutional Neural Net (CNN). Sam got the initial model working. Merve made improvements. Vanessa tuned the hyperparamters. The result is discussed in this document and is a collaborative effort.
 
@@ -236,7 +238,7 @@ word_count <- tidy_sona_words %>%
 word_count %>%
   ggplot(aes(x = as.numeric(year), y = num_words, colour = president)) +
   geom_point() + 
-  geom_smooth(method = "loess", aes(colour = president))
+  geom_smooth(method = "loess", aes(colour = president)) + xlab("Year") + ylab("Number of words")
 
 ```
   
@@ -244,7 +246,7 @@ Of the 3 presidents that have made more than 1 SONA speech, Mbeki used more word
 
 ## Common words used across all SONA speeches
 
-```{r}
+```{r eval=FALSE}
 
 # word cloud for words
 word_count <- tidy_sona_words %>%
@@ -253,6 +255,7 @@ word_count <- tidy_sona_words %>%
 wordcloud2(word_count[1:300, ], size = .6, color='random-dark')
 
 ```
+![Figure: Common bigram wordcloud](images/common_word_cloud.PNG)
   
 ## Common bigrams used across all SONA speeches
 
@@ -264,7 +267,7 @@ bigram_count <- tidy_sona_bigrams %>%
 
 wordcloud2(bigram_count[1:300, ], size = .8, color='random-dark')
 ```
-![Figure: Optimisation Metrics](WordCloud.png)
+![Figure: Common bigram wordcloud](WordCloud.png)
 
 ## Lexical Diversity per President
 
@@ -286,8 +289,8 @@ diversity_per_year %>%
                position = "jitter") +    # point overlap
   geom_smooth(method = "loess", aes(colour = president)) +
   ggtitle("Lexical Diversity per President") +
-  xlab("year") +
-  ylab("")
+  xlab("Year") +
+  ylab("Diversity")
 
 ```
   
@@ -317,8 +320,8 @@ density_per_year %>%
                position = "jitter") +    # point overlap
   geom_smooth(method = "loess", aes(colour = president)) +
   ggtitle("Lexical Density per President") +
-  xlab("year") +
-  ylab("")
+  xlab("Year") +
+  ylab("Diversity")
 
 ```
   
@@ -593,7 +596,7 @@ sentiments_per_year <- tidy_sona_words %>%
 # plot of sentiment by president
 ggplot(sentiments_per_year, aes(x = president, y = avg_sentiment, colour = president)) + 
   geom_boxplot() + # draw a boxplot for each president
-  ggtitle("Boxplots of bing Sentiment per President")
+  ggtitle("Boxplots of bing Sentiment per President") + xlab("President") + ylab("Average Sentiment")
 
 ```
 
@@ -618,7 +621,7 @@ sentiments_per_year %>%
   geom_smooth(method = "loess", aes(colour = president)) +
   ggtitle("Change in bing Sentiment over time") +
   scale_x_discrete(name ="year", 
-                    limits=c(1994,1999,2004,2009,2014))
+                    limits=c(1994,1999,2004,2009,2014)) + xlab("President") + ylab("Average Sentiment")
 
 ```
   
@@ -672,7 +675,7 @@ sentiments_per_year <- tidy_sona_words %>%
 
 # plot of sentiment by president
 ggplot(sentiments_per_year, aes(x = president, y = afinn_sentiment_perc, colour = president)) +   geom_boxplot() + # draw a boxplot for each president
-  ggtitle("Boxplots of afinn sentiment per President")
+  ggtitle("Boxplots of afinn sentiment per President") + xlab("President") + ylab("Afinn Sentiment %")
 
 ```
 
@@ -688,7 +691,7 @@ sentiments_per_year %>%
   geom_smooth(method = "loess", aes(colour = president)) +
   ggtitle("Change in afinn Sentiment over time") +
   scale_x_discrete(name ="year", 
-                    limits=c(1994,1999,2004,2009,2014))
+                    limits=c(1994,1999,2004,2009,2014)) + xlab("President") + ylab("Afinn Sentiment")
 
 ```
   
@@ -929,7 +932,7 @@ bigrams_count_plot %>%
   arrange(desc(count_bigram)) %>%
 ggplot(aes(bigram, count_bigram)) +
   geom_col(show.legend = FALSE , color = "blue", fill = "blue") +
-  coord_flip()
+  coord_flip()  + xlab("Count") + ylab("Bigram")
 
 
 
@@ -1025,7 +1028,6 @@ FindTopicsNumber_plot(result)
 ```
 
 ![Figure: Optimisation Metrics](images/Optimisation.png)
-
 From the above plot, the marginal benefit from adding another topic, stops at around 5-10 topics.  In order to test this, the *"perplexity"* over a test sample for the document term matrix can be checked.
 
 ```{r, echo = FALSE, warning = FALSE, eval=FALSE}
@@ -1409,7 +1411,7 @@ beta_spread %>%
 
 
 ```
-![Figure: WordCloud for Topic 5](images/topiccompare.png)
+![Figure: Comparison of biggest differential between Topic 1 and Topic 5 Bigram](images/topiccompare.png)
 
 For instance, "social programmes", "human fulfilment", "rights commission" are all generated in significantly larger proportions by Topic 5 compared to Topic 1 while "national social", "training colleagues" and "sector unions" all exist with in Topic 1.
 
@@ -1457,7 +1459,7 @@ sample <- as.tibble(sample_n(topic_matrix, size = 1)) %>% select (- election, -i
 
 ```{r, echo = FALSE, warning = FALSE, eval=TRUE}
 load("sample_sentence.RData")
-kable(sample, caption = "Sample sentence showing topic probabilities")
+kable(sample, caption = "Sample sentence showing topic probabilities") %>% kable_styling()
 
 ```
 
@@ -1506,7 +1508,7 @@ data.graph <- left_join(data.graph, totals, by = "president") %>% mutate(pre.top
 
 
 ```
-![Figure: WordCloud for Topic 5](images/pres_topic.png)
+![Figure: Probability of belonging to each Topic, by President](images/pres_topic.png)
 
 
 Consider the mixture of topics that each individual president covers during the SONA address.  Despite the imbalance in the number of sentences said by each president, there seems to be a fairly standard shape to the topics discussed. The two exceptions to this are de Klerk and Zuma. All other presidents tend to send around 10-15% on topic 1 ("Job Creation/Terms of Endearment") and the 15-20% on Topic 2 ("Economy/Criminal and Justice System"), Topic 3 ("Development") and Topic 4 ("Social Reform/Regional and Municipal Government") and the around another 10% on Topic 5 ("Public Sector Entities").  This trend means that it may be difficult for a supervised model to pick up difference in presidents based on the topic covered.  
@@ -1548,7 +1550,7 @@ data.graph %>%
 
 ```
 
-![Figure: WordCloud for Topic 5](images/topic_time.png)
+![Figure: Change in topic composition over time, per president](images/topic_time.png)
 
 
 The graph shows that over time, topics 1 and 5 are the least discussed topics while topics 2,3 and 4 all get much the same airtime. There are a number of notable spikes/valleys:
@@ -1565,7 +1567,7 @@ The graph shows that over time, topics 1 and 5 are the least discussed topics wh
  
 ### Step 5: Using the topic to predict the president
 
-One of the aims behind topic modelling is to reduce the dimensions of the data to allow for other techniques to be applied.  In this instance, the aim was to reduce the SONA speeches to a collection of topics that would help predict which president was responsible for a sentence in the SONA speech.  The assumption was that each president might have a unique set of topics or mixture of topics that could characterise their particular speech.  However, there does not seem to be evidence of this.  The matrix with the probability of each sentence belonging to a topic is used in Section X and the results are discussed.
+One of the aims behind topic modelling is to reduce the dimensions of the data to allow for other techniques to be applied.  In this instance, the aim was to reduce the SONA speeches to a collection of topics that would help predict which president was responsible for a sentence in the SONA speech.  The assumption was that each president might have a unique set of topics or mixture of topics that could characterise their particular speech.  However, there does not seem to be evidence of this.  The matrix with the probability of each sentence belonging to a topic is used in the Neural Nets with Topic Modelling section and the results are discussed.
 
 # Neural Nets 
 
@@ -1649,7 +1651,7 @@ model %>% fit(x_train, y_train, epochs = 10, batch_size = 32, validation_data = 
 load("mnn.RData")
 load("nnm2.RData")
 ```
-![Figure: Bag of words model - neural net training](images/test_accuracy_wordcount_bigger.png)
+![Figure: Bag of words model - neural net training performance](images/test_accuracy_wordcount_bigger.png)
 
 This model has L2 regularization to avoid overfitting but even so it didn't help very much. The accuracy is 0.55886. The optimizer_rmsprop has learning rate 0.003. This was choosen after trying lr=c(0.001, 0.002, 0.003) To make readability easier the model with best learning rate is used. 
 
@@ -1721,7 +1723,7 @@ head(predictions_val %>% filter(prez == "deKlerk") %>% select(pres.max, pres.act
 table_bow <- table(actual = predictions_val$pres.actual, pred = predictions_val$pres.max)
 paste0("Accuracy rate is:" ,round((sum(diag(table_bow))/sum(table_bow)),4))
 ```
-![Figure: Bag of words model - smaller model - neural net training](images/test_accuracy_wordcount_smaller.png)
+![Figure: Bag of words smaller model - neural net training performance](images/test_accuracy_wordcount_smaller.png)
 
 `r table_bow %>% kable() %>% kable_styling()`
 
@@ -1866,7 +1868,7 @@ paste0("Accuracy rate is:" , round((sum(diag(t))/sum(t)),4))
 ```{r}
 table_tfidf %>% kable() %>% kable_styling()
 ```
-![Figure: TF-IDF model - neural net training](images/test_accuracy_tfidf.png)
+![Figure: TF-IDF model - neural net training performance](images/test_accuracy_tfidf.png)
 
 Accuracy rate is: `r round((sum(diag(table_tfidf))/sum(table_tfidf)),4)`.
 
@@ -1974,22 +1976,15 @@ paste0("Accuracy rate is:" , round((sum(diag(table_sentiment))/sum(table_sentime
 
 ```
 ```{r}
+table_sentiment = cbind(table_sentiment, "4" = rep(0, 6), "5" = rep(0, 6),"6" = rep(0, 6))
 table_sentiment %>% kable() %>% kable_styling()
 ```
 
-![Figure: Sentiment Analysis - neural net training](images/test_accuracy_sentiment.png)
+![Figure: Sentiment Analysis - neural net training performance](images/test_accuracy_sentiment.png)
 
 Accuracy of sentiment analysis is: `r round(test_accuracy_sentiment,3)` [`r  round((sum(diag(table_sentiment))/sum(table_sentiment)),4)`].
 
-
-### Cohen's Kappa
-
-```{r eval=FALSE}
-
-#table_sentiment = cbind(table_sentiment,"3"=rep(0,6), "4" = rep(0, 6), "5" = rep(0, 6),"6" = rep(0, 6))
-cohen.kappa(table_sentiment)[1]
-
-```
+Cohen's Kappa: `r cohen.kappa(table_sentiment)[1]`
 
 Sentiment analysis also reaches it's smallest validation loss value on the fifth iteration. But the train accuracy and test accuracy is changing very slightly at each iteration. This model does not seem to be doing well on either the training set or the test set. The test accuracy is 0.4361834 and the training accuracy is 0.4353395. If we look at the NRC sentiment lexicon it is visible that all presidents share same sentiment distribution pattern, so this is why it is not overfitting. Because our set aside test set is actually no different than the training set.
 
@@ -2088,18 +2083,20 @@ paste0("Accuracy rate is:" , round((sum(diag(t))/sum(t)),4))
 ```
 Topic modelling only predicted for president 1(Mbeki) and president 2(Zuma).
 
-![Figure: Topic Modelling - neural net training](images/test_accuracy_topic.png)
+![Figure: Topic Modelling - neural net training performance](images/test_accuracy_topic.png)
 
-### Cohen's Kappa
+
 
 ```{r eval=FALSE}
 
-#table_topic = cbind(table_topic,"3"=rep(0,6), "4" = rep(0, 6), "5" = rep(0, 6),"6" = rep(0, 6))#make it square
-cohen.kappa(table)[1] #it is doing fairly better than a randomly guessing classifier.
+table_topic = cbind(table_topic, "3"=rep(0,6), "3"=rep(0,6), "4" = rep(0, 6), "5" = rep(0, 6),"6" = rep(0, 6))#make it square
+#cohen.kappa(table_topic)[1] #it is doing fairly better than a randomly guessing classifier.
 
 ```
 The train and the test set are not very distinct from each other just like sentiment analysis. 
 If we look at the mixture of the topics by each president in topic modelling chunk we can see that all the topics for each president are kind of uniformed and hard to seperate each president's topic from one another.
+
+Cohen's Kappa: `r cohen.kappa(table_topic)[1]`
 
 ## Sequential Neural Networks
 
@@ -2111,7 +2108,7 @@ For all our sequential neural network attempts, we converted each sentence to a 
 
 An embedding layer is a dimensionality reduction technique that attempts to encode the relationships between words in a sentence (input as a variable length integer array with padding) as a fixed-length floating point vector. An embedding has a tunable hyper-parameter for the number of latent factors to map every sentence on to, where each latent factor attempts to capture a semantic dimension of the sentence as a whole. Embeddings aim to capture the linear substructure of sentences through Euclidean distances between words in the n-dimensional unit hypercube, where n is the number of latent factors specified.
 
-Embeddings can be trained on the corpus of sentences that comprise the dataset under investigation, however this can prove limiting if the there is a relatively small quantity of training data. An alternative approach is to re-use a previously trained embedding layer, such as the Glove embedding \ref{@pennington2014glove}. This has the advantage of leveraging the results from a much larger, and theoretically more generic, dataset in an application of transfer learning. The SONA data has a large number of non-standard or foreign words included, however, which theoretically limits the applicability of pre-trained embeddings.
+Embeddings can be trained on the corpus of sentences that comprise the dataset under investigation, however this can prove limiting if the there is a relatively small quantity of training data. An alternative approach is to re-use a previously trained embedding layer, such as the Glove embedding. This has the advantage of leveraging the results from a much larger, and theoretically more generic, dataset in an application of transfer learning. The SONA data has a large number of non-standard or foreign words included, however, which theoretically limits the applicability of pre-trained embeddings.
 
 ## Convolutional Neural Network (CNN)
 
@@ -2342,7 +2339,7 @@ paste0("Baseline_accuracies")
 (baseline_accuracies = table(input_data$sentences$president)*100/sum(table(input_data$sentences$president)))
 ```
 
-![Figure: Glove transfer learning - neural net training](images/test_accuracy_transferlearning.png)
+![Figure: Glove transfer learning - neural net training performance](images/test_accuracy_transferlearning.png)
 
 ```{r}
 t %>% kable() %>% kable_styling()
@@ -2353,7 +2350,7 @@ t %>% kable() %>% kable_styling()
  * Majority of the sentences of Mandela is predicted as Mandela(263/381).
  * Majority of the sentences of Mothlane(38/66) is predicted as Mandela.
  * Majority of sentences of Ramaphosa is predicted as Mandela(19/47) or Zuma(15/47).
- * Mojority of the sentences of deKlerk is predicted as Mandela(14/17).
+ * Majority of the sentences of deKlerk is predicted as Mandela(14/17).
 
 ### Cohen's Kappa
 
@@ -2407,7 +2404,7 @@ result_data %>% kable() %>% kable_styling()
 
 The sentiment and topic models give some insight into the SONA speeches with regard to the general feeling and themes discussed.  Disappointingly, they do not give enough flavour of the man behind the presidency – perhaps they shared speech writers?
 
-Predicting which president said a sentence has only reasonable success despite many alternative approaches.  Our best validation accuracy cannot overcome the 65% mark.  Considering the imbalanced nature of the data and the fact that Zuma dominates the number of sentences, it may be the best we can hope to predict.  However, this does four times better than randomly picking one the six presidents which would only give an accuracy rate of 16.67%.
+Predicting which president said a sentence has only reasonable success despite many alternative approaches.  Our best validation accuracy cannot overcome the 63% mark.  Considering the imbalanced nature of the data and the fact that Zuma dominates the number of sentences, it may be the best we can hope to predict.  However, this does four times better than randomly picking one the six presidents which would only give an accuracy rate of 16.67%.
 
 # References
 
