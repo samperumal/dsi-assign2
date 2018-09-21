@@ -7,7 +7,6 @@ author:
 - Vanessa Saker
 date: "20 September 2018"
 output:
-  pdf_document: default
   html_document: default
 ---
 
@@ -75,7 +74,7 @@ The initial results from the Neural Net gave a 63% accuracy on the validation se
 
 Given the low accuracy of the neural net (NN), we tried a Convolutional Neural Net (CNN). Sam got the initial model working. Merve made improvements. Vanessa tuned the hyperparamters. The result is discussed in this document and is a collaborative effort.
 
-The CNN did not provide an improvement over the initial NN, and as a result we tried a Recurrent Neural Net (RNN). This takes ina sequence of data and gives importance to the order of the words in order to make a prediction.
+The CNN did not provide an improvement over the initial NN, and as a result we tried a Recurrent Neural Net (RNN). This takes in a sequence of data and gives importance to the order of the words in order to make a prediction.
 
 # Data Preparation
 
@@ -246,7 +245,7 @@ Of the 3 presidents that have made more than 1 SONA speech, Mbeki used more word
 
 ## Common words used across all SONA speeches
 
-```{r eval=FALSE}
+```{r eval=TRUE}
 
 # word cloud for words
 word_count <- tidy_sona_words %>%
@@ -255,7 +254,9 @@ word_count <- tidy_sona_words %>%
 wordcloud2(word_count[1:300, ], size = .6, color='random-dark')
 
 ```
-![Figure: Common bigram wordcloud](images/common_word_cloud.PNG)
+Figure: Common words wordcloud
+
+If we remove the dominant words: "government", "south", "africa" and "african", the most common words across all SONA speeches shown in the WordCloud are "people", "development", "national", "country", "public", "ensure", "continue", "regard" and "economic". One can hover over the html version to get the counts.
   
 ## Common bigrams used across all SONA speeches
 
@@ -268,6 +269,8 @@ bigram_count <- tidy_sona_bigrams %>%
 wordcloud2(bigram_count[1:300, ], size = .8, color='random-dark')
 ```
 ![Figure: Common bigram wordcloud](WordCloud.png)
+
+If we remove the dominant bigrams: "south africa", "south africans", "south african" and "local government", the most common bigrams across all SONA speeches shown in the WordCloud are "public service", "economic growth", "private sector", "united nations", "public sector", "job creation", "world cup", "nelson mandela", "economic empowerment", "black economic", "human rights", "development programme", "rural development" and "social grants".
 
 ## Lexical Diversity per President
 
